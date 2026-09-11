@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gold Trading Terminal</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/css/terminal.css?v=11">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand">
+    <div class="brand-mark">XAU</div>
+    <div class="brand-text">
+      <div class="brand-name">Gold Terminal</div>
+      <div class="brand-sub">XAU/USD research &amp; sim</div>
+    </div>
+  </div>
+  <nav class="nav" id="nav">
+    <button type="button" class="nav-item" data-module="live" title="Attempts a live biquote.io feed; falls back to the simulated one if unreachable"><span class="nav-icon">●</span><span class="nav-label">Live</span></button>
+    <button type="button" class="nav-item active" data-module="demo" title="Paper trading against the simulated feed"><span class="nav-icon">◎</span><span class="nav-label">Demo</span></button>
+    <button type="button" class="nav-item" data-module="backtest"><span class="nav-icon">↻</span><span class="nav-label">Backtest</span></button>
+  </nav>
+  <div class="sidebar-foot">
+    <div class="build-tag">All 6 phases live</div>
+    <div class="build-note">Live and Demo share the same play-money paper account and views (Chart, Dashboard, Trade, Positions, History) — they only differ in which feed source they trade against. Real trading is never enabled.</div>
+  </div>
+</aside>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="section-title" id="sectionTitle">Demo</div>
+    <div class="data-badge" id="dataBadge">loading data…</div>
+    <div class="data-badge" id="spotCheckBadge" hidden title="Independent XAU/USD spot price from gold-api.com — an external real-world cross-check, refreshed every few minutes (not the feed you're trading against)"></div>
+  </div>
+  <div class="topbar-right">
+    <div class="sub-nav" id="subNav"></div>
+    <button type="button" class="icon-btn" id="logoutBtn" title="Sign out" hidden>⏻</button>
+    <button type="button" class="icon-btn" id="settingsBtn" title="Settings">⚙</button>
+  </div>
+</header>
+
+<main class="content" id="content">
+
+  <section class="view active" id="view-charts">
+    <div class="chart-toolbar">
+      <div class="pillgroup" id="tfPills"></div>
+      <div class="chart-warning" id="chartWarning"></div>
+      <div class="live-badge" id="liveBadge" hidden><span class="live-dot"></span><span id="liveBadgeLabel">LIVE</span></div>
+      <div class="ohlc-readout" id="ohlcReadout"></div>
+    </div>
+    <div class="chart-layout">
+      <div class="chart-panel">
+        <div id="priceChart" class="chart-surface"></div>
+      </div>
+      <div class="bt-config chart-ticket">
+        <div class="bt-panel-title">Trade this chart</div>
+        <div class="feed-bar chart-feed-bar">
+          <div class="feed-status" id="chartFeedStatus">feed: —</div>
+          <button type="button" class="pill-btn" id="chartFeedToggle">Start feed</button>
+        </div>
+        <div class="bt-panel-note" id="chartFeedNote"></div>
+
+        <div class="bt-field">
+          <label id="chartDirLabel">Direction</label>
+          <div class="pillgroup dir-pills" id="chartDirPills" role="group" aria-labelledby="chartDirLabel"></div>
+        </div>
+        <div class="bt-field-row">
+          <div>
+            <label for="chartStop">Stop-loss <button type="button" class="dash-mini-action" id="chartSuggestSl" title="Suggest from ATR × the default multiple set in Settings">Suggest</button></label>
+            <input type="number" id="chartStop" step="0.01">
+          </div>
+          <div><label for="chartTP">Take-profit <span class="bt-panel-note">auto-fills from SL × R:R once set</span></label><input type="number" id="chartTP" step="0.01" placeholder="optional"></div>
+        </div>
+        <div class="bt-field">
+          <label for="chartRiskPct">Risk (%)</label>
+          <input type="number" id="chartRiskPct" step="0.1">
+        </div>
+        <div class="calc-result" id="chartSizePreview"></div>
+        <button type="button" class="bt-run-btn" id="chartSubmit">Place market order</button>
+        <div class="risk-warning" id="chartOrderError" hidden></div>
+
+        <div class="bt-subhead">Open position</div>
+        <div id="chartPositionBox" class="chart-position-box">No open position.</div>
+      </div>
+    </div>
+
+    <div class="bt-panel" id="chartIndicatorsPanel" hidden>
+      <div class="bt-panel-title">Strategy Indicators <span class="bt-panel-note" id="chartIndicatorsNote"></span></div>
+      <div class="bt-panel-note">Dashed lines on the chart above are this strategy's own reference levels (EMA, PDH/PDL, swing highs/lows — capped to the 6 most relevant). Oscillators (RSI, MACD, ADX, Stochastic) are a different scale from price, so they're shown here instead.</div>
+      <div id="chartStateBadges" class="state-badges"></div>
+      <div class="legend" id="chartOscLegend"></div>
+      <div id="chartOscChart" class="mini-chart" hidden></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-dashboard">
+    <div class="feed-bar">
+      <div class="feed-status" id="dashFeedStatus">feed: —</div>
+      <div class="pillgroup" id="dashSpeedPills"></div>
+      <button type="button" class="pill-btn" id="dashFeedToggle">Start feed</button>
+      <div class="bt-panel-note" id="dashSimTime"></div>
+    </div>
+    <div class="stat-tiles" id="dashStats"></div>
+
+    <div class="bt-panel">
+      <div class="bt-panel-title">Strategy Wallets <span class="bt-panel-note">each strategy trades its own separate virtual balance — the tiles above are the manual/order-ticket wallet only</span></div>
+      <div class="table-scroll"><table id="walletsTable"></table></div>
+    </div>
+
+    <div class="bt-split-grid">
+      <div class="bt-panel">
+        <div class="bt-panel-title">Open positions <span class="bt-panel-note" id="dashPosCount"></span></div>
+        <div class="table-scroll"><table id="dashPosTable"></table></div>
+      </div>
+      <div class="bt-panel">
+        <div class="bt-panel-title">Recent activity</div>
+        <div class="table-scroll"><table id="dashHistTable"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="view-strategies">
+    <div class="strat-layout">
+      <div class="bt-config">
+        <div class="bt-panel-title" id="stratFormTitle">New strategy config</div>
+        <div class="bt-field">
+          <label id="stratModeLabel">Strategy type</label>
+          <div class="pillgroup" id="stratModePills" role="group" aria-labelledby="stratModeLabel"></div>
+        </div>
+        <div class="bt-field">
+          <label for="stratName">Name</label>
+          <input type="text" id="stratName" placeholder="e.g. Trend Pullback — loose ADX">
+        </div>
+
+        <div id="stratBuiltinForm">
+          <div class="bt-field">
+            <label for="stratClass">Strategy class</label>
+            <select id="stratClass" class="bt-select" title="Strategy class"></select>
+          </div>
+          <div id="stratParams" class="bt-params"></div>
+        </div>
+
+        <div id="stratBuilderForm" hidden>
+          <div class="bt-panel-note builder-hint">No code needed: add indicators, then build entry rules from them. Exits are handled by the stop-loss / take-profit / trailing stop below — not by separate exit rules yet.</div>
+
+          <div class="bt-subhead">Indicators</div>
+          <div id="builderIndicators" class="builder-indicator-list"></div>
+          <div class="bt-field-row">
+            <select id="builderAddIndicator" class="bt-select" title="Add indicator"></select>
+            <button type="button" id="builderAddIndicatorBtn" class="bt-secondary-btn">+ Add indicator</button>
+          </div>
+
+          <div class="bt-subhead">Entry — Long <span class="bt-panel-note">all conditions using AND unless you switch to OR</span></div>
+          <div class="bt-field">
+            <div class="pillgroup" id="builderLongCombinator"></div>
+          </div>
+          <div id="builderLongConditions" class="builder-condition-list"></div>
+          <button type="button" class="bt-secondary-btn" id="builderAddLongCond">+ Add condition</button>
+
+          <div class="bt-subhead">Entry — Short</div>
+          <div class="bt-field">
+            <div class="pillgroup" id="builderShortCombinator"></div>
+          </div>
+          <div id="builderShortConditions" class="builder-condition-list"></div>
+          <button type="button" class="bt-secondary-btn" id="builderAddShortCond">+ Add condition</button>
+
+          <div class="bt-subhead">Exit rules</div>
+          <div class="bt-field-row">
+            <div>
+              <label for="builderSlType">Stop-loss</label>
+              <select id="builderSlType" class="bt-select">
+                <option value="atr_mult">ATR × multiple</option>
+                <option value="fixed_points">Fixed points ($)</option>
+                <option value="fixed_pct">Fixed % of price</option>
+              </select>
+            </div>
+            <div><label for="builderSlValue">Value</label><input type="number" id="builderSlValue" step="0.1" value="1.5"></div>
+          </div>
+          <div class="bt-field-row">
+            <div>
+              <label for="builderTpType">Take-profit</label>
+              <select id="builderTpType" class="bt-select">
+                <option value="rr">Risk:Reward multiple</option>
+                <option value="fixed_points">Fixed points ($)</option>
+                <option value="fixed_pct">Fixed % of price</option>
+                <option value="none">None (SL/trailing only)</option>
+              </select>
+            </div>
+            <div><label for="builderTpValue">Value</label><input type="number" id="builderTpValue" step="0.1" value="2.0"></div>
+          </div>
+          <div class="bt-field">
+            <label for="builderTrail">Trailing stop — ATR × multiple <span class="bt-panel-note">optional</span></label>
+            <input type="number" id="builderTrail" step="0.1" placeholder="off">
+          </div>
+
+          <div class="bt-field">
+            <label for="builderTimeframe">Working timeframe <span class="bt-panel-note">the bar size this strategy actually trades on, live and in backtests</span></label>
+            <select id="builderTimeframe" class="bt-select">
+              <option value="1min">1m</option>
+              <option value="5min">5m</option>
+              <option value="15min" selected>15m</option>
+              <option value="30min">30m</option>
+              <option value="1h">1h</option>
+              <option value="4h">4h</option>
+              <option value="1d">1D</option>
+            </select>
+          </div>
+
+          <div class="bt-field">
+            <label id="builderSessionLabel">Trading session <span class="bt-panel-note">optional — UTC hours</span></label>
+            <div class="bt-field-row">
+              <input type="text" id="builderSessionStart" placeholder="e.g. 07:00">
+              <input type="text" id="builderSessionEnd" placeholder="e.g. 20:00">
+            </div>
+          </div>
+
+          <div class="risk-warning" id="builderError" hidden></div>
+        </div>
+
+        <div class="bt-save-row">
+          <button type="button" id="stratSave">Create</button>
+          <button type="button" id="stratCancelEdit" hidden>Cancel edit</button>
+        </div>
+      </div>
+
+      <div class="bt-panel strat-list-panel">
+        <div class="bt-panel-title">Saved strategies <span class="bt-panel-note" id="stratCount"></span></div>
+        <div class="bt-panel-note compare-hint">Check two or more to compare below.</div>
+        <div id="stratList" class="strat-cards"></div>
+      </div>
+    </div>
+
+    <div class="bt-panel">
+      <div class="bt-panel-title">Strategy Library <span class="bt-panel-note" id="libraryCount"></span></div>
+      <div class="bt-panel-note">Every saved strategy, backtested over the trailing 1 year of available data. Sort by whichever tells you the most — highest return is rarely the best answer alone.</div>
+      <div class="compare-controls">
+        <div class="pillgroup" id="librarySortPills"></div>
+        <button type="button" class="bt-secondary-btn" id="libraryRefresh">Refresh</button>
+      </div>
+      <div class="bt-empty" id="libraryEmpty">No saved strategies yet.</div>
+      <div class="table-scroll" id="libraryTableWrap" hidden><table id="libraryTable"></table></div>
+    </div>
+
+    <div class="bt-panel">
+      <div class="bt-panel-title">Compare strategies</div>
+      <div class="compare-controls">
+        <div class="pillgroup" id="compareTfPills"></div>
+        <div class="pillgroup" id="compareSessionPills"></div>
+        <div class="bt-field-row compare-dates">
+          <div><label for="compareFrom">From</label><input type="date" id="compareFrom"></div>
+          <div><label for="compareTo">To</label><input type="date" id="compareTo"></div>
+        </div>
+        <button type="button" class="bt-run-btn compare-run-btn" id="compareRun">Run Comparison</button>
+      </div>
+      <div class="bt-empty" id="compareEmpty">Select two or more saved strategies above (checkboxes on each card) to compare.</div>
+      <div id="compareResults" hidden>
+        <div class="legend" id="compareLegend"></div>
+        <div id="compareChart" class="mini-chart"></div>
+        <div class="table-scroll"><table id="compareTable"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="view-backtest">
+    <div class="bt-layout">
+      <div class="bt-config">
+        <div class="bt-field">
+          <label for="btStrategy">Strategy</label>
+          <select id="btStrategy" class="bt-select" title="Strategy"></select>
+        </div>
+        <div id="btParams" class="bt-params"></div>
+
+        <div class="bt-field">
+          <label for="btSavedConfig">Saved config</label>
+          <select id="btSavedConfig" class="bt-select" title="Saved config">
+            <option value="">— none (ad-hoc) —</option>
+          </select>
+        </div>
+        <div class="bt-save-row">
+          <input type="text" id="btConfigName" placeholder="Name this configuration…">
+          <button type="button" id="btSaveConfig" title="Save current strategy + params as a new named config">Save as new</button>
+        </div>
+        <div class="bt-save-row" id="btUpdateRow" hidden>
+          <button type="button" id="btUpdateConfig">Update "<span id="btUpdateName"></span>"</button>
+          <button type="button" id="btDeleteConfig" class="bt-danger-btn">Delete</button>
+        </div>
+
+        <div class="bt-field">
+          <label id="btTfLabel">Timeframe</label>
+          <div class="pillgroup" id="btTfPills" role="group" aria-labelledby="btTfLabel"></div>
+        </div>
+        <div class="bt-field">
+          <label id="btSessionLabel">Session</label>
+          <div class="pillgroup" id="btSessionPills" role="group" aria-labelledby="btSessionLabel"></div>
+        </div>
+        <div class="bt-field">
+          <label id="btRangeLabel">Date range</label>
+          <div class="pillgroup" id="btRangePills" role="group" aria-labelledby="btRangeLabel"></div>
+        </div>
+        <div class="bt-field bt-field-row">
+          <div><label for="btFrom">From</label><input type="date" id="btFrom"></div>
+          <div><label for="btTo">To</label><input type="date" id="btTo"></div>
+        </div>
+        <div class="bt-panel-note" id="btRangeNote"></div>
+
+        <div class="bt-subhead">Account &amp; costs</div>
+        <div class="bt-field bt-field-row">
+          <div><label for="btEquity">Initial equity ($)</label><input type="number" id="btEquity" value="10000" step="100"></div>
+          <div><label for="btRisk">Risk / trade (%)</label><input type="number" id="btRisk" value="0.5" step="0.1"></div>
+        </div>
+        <div class="bt-field bt-field-row">
+          <div><label for="btSpread">Spread ($/oz)</label><input type="number" id="btSpread" value="0.30" step="0.01"></div>
+          <div><label for="btSlippage">Slippage ($/oz)</label><input type="number" id="btSlippage" value="0.10" step="0.01"></div>
+        </div>
+        <div class="bt-field bt-field-row">
+          <div><label for="btCommission">Commission ($/lot)</label><input type="number" id="btCommission" value="0" step="0.1"></div>
+          <div><label for="btMaxTrades">Max trades/day</label><input type="number" id="btMaxTrades" value="3" step="1"></div>
+        </div>
+        <div class="bt-field bt-checkbox">
+          <label for="btOptimistic"><input type="checkbox" id="btOptimistic"> Optimistic ambiguous bars (target-first)</label>
+        </div>
+
+        <div class="bt-subhead">Risk limits <span class="bt-panel-note">— halts new entries, not open ones</span></div>
+        <div class="bt-field bt-field-row">
+          <div><label for="btMaxDailyLoss">Max daily loss (%)</label><input type="number" id="btMaxDailyLoss" placeholder="off" step="0.1"></div>
+          <div><label for="btMaxDrawdown">Max drawdown halt (%)</label><input type="number" id="btMaxDrawdown" placeholder="off" step="0.5"></div>
+        </div>
+
+        <button type="button" class="bt-run-btn" id="btRun">Run Backtest</button>
+      </div>
+
+      <div class="bt-results" id="btResults">
+        <div class="bt-empty" id="btEmpty">Configure a strategy on the left and click <b>Run Backtest</b> to see results.</div>
+
+        <div id="btResultsBody" class="bt-results-body" hidden>
+          <div class="chart-warning" id="btWarning"></div>
+          <div class="risk-warning" id="btRiskNote" hidden></div>
+
+          <div class="stat-tiles" id="btStats"></div>
+
+          <div class="bt-panel">
+            <div class="bt-panel-title">Equity curve</div>
+            <div id="btEquityChart" class="mini-chart"></div>
+          </div>
+          <div class="bt-panel">
+            <div class="bt-panel-title">Drawdown</div>
+            <div id="btDrawdownChart" class="mini-chart mini-chart-small"></div>
+          </div>
+
+          <div class="bt-panel">
+            <div class="bt-panel-title">Price &amp; trades <span class="bt-panel-note">click a trade row below to plot its entry/exit/SL/TP</span></div>
+            <div id="btPriceChart" class="chart-surface bt-price-chart"></div>
+          </div>
+
+          <div class="bt-split-grid">
+            <div class="bt-panel">
+              <div class="bt-panel-title">Session performance</div>
+              <div class="table-scroll"><table id="btSessionTable"></table></div>
+            </div>
+            <div class="bt-panel">
+              <div class="bt-panel-title">Exit reason mix</div>
+              <div class="table-scroll"><table id="btExitTable"></table></div>
+            </div>
+          </div>
+
+          <div class="bt-split-grid">
+            <div class="bt-panel">
+              <div class="bt-panel-title">Yearly performance</div>
+              <div class="table-scroll"><table id="btYearTable"></table></div>
+            </div>
+            <div class="bt-panel">
+              <div class="bt-panel-title">Best / worst month</div>
+              <div id="btBestWorst" class="best-worst"></div>
+            </div>
+          </div>
+
+          <div class="bt-panel">
+            <div class="bt-panel-title">Monthly performance</div>
+            <div class="table-scroll"><table id="btMonthTable"></table></div>
+          </div>
+
+          <div class="bt-panel">
+            <div class="bt-panel-title">Trade log <span class="bt-panel-note" id="btTradeCount"></span></div>
+            <div class="table-scroll bt-trade-scroll"><table id="btTradeTable"></table></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="view-paper">
+    <div class="bt-panel">
+      <div class="bt-panel-title">Auto-trade a strategy</div>
+      <div class="bt-panel-note">Check as many strategies as you want — built-in or built with the no-code rule builder — and start them together. Each runs fully independently: its own wallet, its own declared timeframe, entries/stops/targets/trailing stops/OCO all handled for you. Uses live biquote.io prices when connected, otherwise the simulated replay as a fallback. Still 100% virtual money — nothing here reaches a real broker.</div>
+      <div class="bt-field">
+        <label>Saved strategies <span class="bt-panel-note" id="autoSelectedCount"></span></label>
+        <div id="autoStrategyList" class="auto-strategy-list"></div>
+      </div>
+      <div class="bt-field-row">
+        <div>
+          <label for="autoRiskPct">Risk / trade (%) <span class="bt-panel-note">applied to every strategy started below</span></label>
+          <input type="number" id="autoRiskPct" step="0.1" placeholder="account default">
+        </div>
+      </div>
+      <button type="button" class="bt-run-btn" id="autoToggle">Start Selected</button>
+      <div class="risk-warning" id="autoStartError" hidden></div>
+    </div>
+
+    <div class="bt-panel">
+      <div class="bt-panel-title">Running strategies <span class="bt-panel-note" id="autoRunningCount"></span></div>
+      <div id="autoRunningList" class="bt-panel-note">Nothing running yet.</div>
+    </div>
+
+    <div class="bt-panel">
+      <div class="bt-panel-title">Live Activity <span class="bt-panel-note" id="activityCount"></span></div>
+      <div class="bt-panel-note">What the strategy is actually doing, as it happens — signals it evaluates, orders it fills, positions it closes and why. Newest first.</div>
+      <div id="activityFeed" class="activity-feed">
+        <div class="builder-empty-note">Nothing yet — start auto-trade to see it here.</div>
+      </div>
+    </div>
+
+    <div class="bt-panel">
+      <div class="bt-panel-title">Trade Log <span class="bt-panel-note" id="autoHistCount"></span></div>
+      <div class="bt-panel-note">Closed trades — the permanent record. Unlike Live Activity above, this survives a server restart and is what Trade History (sidebar tab) shows in full.</div>
+      <div class="table-scroll bt-trade-scroll"><table id="autoHistTable"></table></div>
+    </div>
+
+    <div class="paper-layout">
+      <div class="bt-config">
+        <div class="bt-panel-title">Order ticket</div>
+        <div class="price-ticker" id="paperTicker">—</div>
+
+        <div class="bt-field">
+          <label id="paperKindLabel">Order type</label>
+          <div class="pillgroup" id="paperKindPills" role="group" aria-labelledby="paperKindLabel"></div>
+        </div>
+        <div class="bt-field">
+          <label id="paperDirLabel">Direction</label>
+          <div class="pillgroup dir-pills" id="paperDirPills" role="group" aria-labelledby="paperDirLabel"></div>
+        </div>
+        <div class="bt-field" id="paperTriggerField" hidden>
+          <label for="paperTrigger">Trigger price</label>
+          <input type="number" id="paperTrigger" step="0.01">
+        </div>
+        <div class="bt-field-row">
+          <div><label for="paperStop">Stop-loss</label><input type="number" id="paperStop" step="0.01"></div>
+          <div><label for="paperTP">Take-profit</label><input type="number" id="paperTP" step="0.01" placeholder="optional"></div>
+        </div>
+        <div class="bt-field-row">
+          <div><label for="paperRiskPct">Risk (%)</label><input type="number" id="paperRiskPct" step="0.1"></div>
+          <div><label for="paperLots">Lots (override)</label><input type="number" id="paperLots" step="0.01" placeholder="auto"></div>
+        </div>
+        <div class="calc-result" id="paperSizePreview"></div>
+        <button type="button" class="bt-run-btn" id="paperSubmit">Place order</button>
+        <div class="risk-warning" id="paperOrderError" hidden></div>
+      </div>
+
+      <div class="bt-results">
+        <div class="bt-panel">
+          <div class="bt-panel-title">Pending orders <span class="bt-panel-note" id="paperOrderCount"></span></div>
+          <div class="table-scroll"><table id="paperOrdersTable"></table></div>
+        </div>
+        <div class="bt-panel">
+          <div class="bt-panel-title">Open positions <span class="bt-panel-note" id="paperPosCount"></span></div>
+          <div class="table-scroll"><table id="paperPosTable"></table></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="view-positions">
+    <div class="bt-panel">
+      <div class="bt-panel-title">Open positions <span class="bt-panel-note" id="posCount"></span></div>
+      <div class="table-scroll"><table id="posTable"></table></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-history">
+    <div class="bt-panel">
+      <div class="bt-panel-title">Strategy performance <span class="bt-panel-note">click a row to filter the trade log below</span></div>
+      <div class="table-scroll"><table id="histStrategyTable"></table></div>
+    </div>
+    <div class="bt-panel hist-panel">
+      <div class="bt-panel-title">Trade history <span class="bt-panel-note" id="histCount"></span></div>
+      <div class="hist-filters">
+        <select class="bt-select" id="histFilterStrategy"><option value="all">All strategies</option></select>
+        <select class="bt-select" id="histFilterSession">
+          <option value="all">All sessions</option>
+          <option value="asian">Asian</option>
+          <option value="london">London</option>
+          <option value="overlap">Overlap</option>
+          <option value="ny">New York</option>
+        </select>
+        <select class="bt-select" id="histFilterSide">
+          <option value="all">All sides</option>
+          <option value="1">Long</option>
+          <option value="-1">Short</option>
+        </select>
+      </div>
+      <div class="table-scroll bt-trade-scroll hist-fill"><table id="histTable"></table></div>
+    </div>
+  </section>
+
+
+</main>
+
+<div class="settings-overlay" id="settingsOverlay" hidden>
+  <div class="settings-backdrop" id="settingsBackdrop"></div>
+  <div class="settings-panel">
+    <div class="settings-panel-head">
+      <div class="settings-panel-title">Settings</div>
+      <button type="button" class="icon-btn" id="settingsClose" title="Close">✕</button>
+    </div>
+    <div class="settings-panel-body">
+      <div class="settings-layout">
+        <div class="bt-panel">
+          <div class="bt-panel-title">Default risk settings <span class="bt-panel-note">applied when the Backtest view opens; also gates Live/Demo trading</span></div>
+          <div class="bt-field-row settings-grid">
+            <div><label for="setRisk">Risk / trade (%)</label><input type="number" id="setRisk" step="0.1"></div>
+            <div><label for="setMaxRisk">Max risk / trade (%)</label><input type="number" id="setMaxRisk" step="0.1"></div>
+          </div>
+          <div class="bt-field-row settings-grid">
+            <div><label for="setDailyLoss">Max daily loss (%)</label><input type="number" id="setDailyLoss" step="0.1" placeholder="off"></div>
+            <div><label for="setMaxDD">Max drawdown halt (%)</label><input type="number" id="setMaxDD" step="0.5" placeholder="off"></div>
+          </div>
+          <div class="bt-field-row settings-grid">
+            <div><label for="setMaxOpen">Max open positions</label><input type="number" id="setMaxOpen" step="1"></div>
+            <div><label for="setContract">Contract size (oz/lot)</label><input type="number" id="setContract" step="1"></div>
+          </div>
+          <div class="bt-field-row settings-grid">
+            <div><label for="setMinLot">Min lot</label><input type="number" id="setMinLot" step="0.01"></div>
+            <div><label for="setMaxLot">Max lot</label><input type="number" id="setMaxLot" step="1"></div>
+          </div>
+          <div class="bt-field-row settings-grid">
+            <div><label for="setSlAtrMult">Default SL — ATR × multiple <span class="bt-panel-note">suggests a stop distance on the manual order ticket</span></label><input type="number" id="setSlAtrMult" step="0.1"></div>
+            <div><label for="setTpRr">Default TP — Risk:Reward multiple <span class="bt-panel-note">separate from SL; auto-fills TP once SL is set</span></label><input type="number" id="setTpRr" step="0.1"></div>
+          </div>
+          <button type="button" class="bt-run-btn" id="setSave">Save defaults</button>
+          <div class="chart-warning" id="setSaved" hidden>Saved.</div>
+        </div>
+
+        <div class="bt-panel">
+          <div class="bt-panel-title">Position size calculator <span class="bt-panel-note">uses the same gold_bot.risk.position_size the backtester and paper trading share</span></div>
+          <div class="bt-field-row settings-grid">
+            <div><label for="calcEquity">Account equity ($)</label><input type="number" id="calcEquity" value="10000" step="100"></div>
+            <div><label for="calcRiskPct">Risk this trade (%)</label><input type="number" id="calcRiskPct" value="0.5" step="0.1"></div>
+          </div>
+          <div class="bt-field-row settings-grid">
+            <div><label for="calcEntry">Entry price</label><input type="number" id="calcEntry" step="0.01" placeholder="1950.00"></div>
+            <div><label for="calcStop">Stop-loss price</label><input type="number" id="calcStop" step="0.01" placeholder="1945.00"></div>
+          </div>
+          <div class="calc-result" id="calcResult"></div>
+        </div>
+
+        <div class="bt-panel">
+          <div class="bt-panel-title">Live data source</div>
+          <div class="bt-panel-note">Polls biquote.io — a free, keyless service backed by a real MetaTrader 5 feed — for live bid/ask ticks and genuine recent OHLC bars. No broker or extra package needed, just internet access. Never places a real order — this only ever feeds prices into the same paper account as Demo mode. Switching modules in the sidebar (Live/Demo) does this for you automatically; use this panel to override manually.</div>
+          <div class="live-feed-status" id="liveFeedStatus">source: —</div>
+          <div class="bt-save-row">
+            <button type="button" id="liveConnect">Connect to biquote.io</button>
+            <button type="button" id="liveUseSim">Use simulated feed</button>
+          </div>
+          <div class="risk-warning" id="liveFeedError" hidden></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="/js/chart.js?v=4"></script>
+<script src="/js/backtest.js?v=7"></script>
+<script src="/js/strategies.js?v=4"></script>
+<script src="/js/settings.js?v=3"></script>
+<script src="/js/paper.js?v=17"></script>
+<script src="/js/app.js?v=22"></script>
+</body>
+</html>

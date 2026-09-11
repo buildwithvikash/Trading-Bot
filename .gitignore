@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+data/terminal.sqlite3
+.claude/
+webapp_server_*.log
+results/

@@ -1,0 +1,464 @@
+:root{
+  color-scheme: dark;
+  --bg:        #0a0c0f;
+  --panel:     #12151b;
+  --panel-2:   #171b22;
+  --elevated:  #1c212a;
+  --border:    rgba(255,255,255,.08);
+  --border-2:  rgba(255,255,255,.14);
+  --text:      #e7eaee;
+  --text-dim:  #97a1ad;
+  --text-faint:#5b6472;
+  --accent:    #d8ac47;
+  --accent-soft: rgba(216,172,71,.14);
+  --good:      #3ecb3e;
+  --good-bg:   rgba(62,203,62,.12);
+  --bad:       #e4685f;
+  --bad-bg:    rgba(228,104,95,.12);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  --radius: 8px;
+}
+*{box-sizing:border-box}
+/* the `hidden` attribute's UA-default display:none loses to any later rule
+   of equal specificity (e.g. .icon-btn{display:flex}) — this reasserts it
+   everywhere, so `el.hidden = true` always actually hides the element. */
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:"Inter",system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  display:grid;
+  grid-template-columns: 224px 1fr;
+  grid-template-rows: 56px 1fr;
+  grid-template-areas: "sidebar topbar" "sidebar content";
+}
+.num{font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+
+/* ---------- sidebar ---------- */
+.sidebar{
+  grid-area:sidebar; background:var(--panel); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; padding:16px 12px; gap:18px; overflow-y:auto;
+}
+.brand{display:flex; align-items:center; gap:10px; padding:2px 6px}
+.brand-mark{
+  width:34px; height:34px; border-radius:8px; background:linear-gradient(160deg, var(--accent), #8a6d2a);
+  color:#1a1408; font-weight:700; font-size:12px; display:flex; align-items:center; justify-content:center;
+  font-family:"IBM Plex Mono",monospace; letter-spacing:-.02em; flex:none;
+}
+.brand-name{font-size:14px; font-weight:700; letter-spacing:-.01em}
+.brand-sub{font-size:10.5px; color:var(--text-faint)}
+.nav{display:flex; flex-direction:column; gap:2px}
+.nav-item{
+  display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:7px;
+  border:none; background:transparent; color:var(--text-dim); font-family:inherit;
+  font-size:13px; font-weight:500; text-align:left; cursor:pointer; width:100%;
+}
+.nav-item:hover{background:var(--panel-2); color:var(--text)}
+.nav-item.active{background:var(--accent-soft); color:var(--accent)}
+.nav-icon{width:16px; text-align:center; font-size:13px; opacity:.85}
+.sidebar-foot{margin-top:auto; padding:12px 10px; border-top:1px solid var(--border)}
+.build-tag{
+  display:inline-block; font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--accent); background:var(--accent-soft); padding:3px 8px; border-radius:5px; margin-bottom:8px;
+}
+.build-note{font-size:11px; color:var(--text-faint); line-height:1.5}
+
+/* ---------- topbar ---------- */
+.topbar{
+  grid-area:topbar; background:var(--panel); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; padding:0 20px;
+}
+.topbar-left{display:flex; align-items:center; gap:14px}
+.section-title{font-size:15px; font-weight:700}
+.data-badge{
+  font-size:11px; font-weight:600; padding:4px 10px; border-radius:6px; border:1px solid var(--border);
+  color:var(--text-dim); font-family:"IBM Plex Mono",monospace;
+}
+.data-badge.real{color:var(--good); border-color:rgba(62,203,62,.35); background:var(--good-bg)}
+.data-badge.synthetic{color:var(--accent); border-color:rgba(216,172,71,.35); background:var(--accent-soft)}
+.mode-switch{display:flex; gap:3px; background:var(--panel-2); padding:3px; border-radius:8px}
+.mode-btn{
+  font-family:inherit; font-size:12px; font-weight:600; padding:6px 14px; border-radius:6px;
+  border:none; background:transparent; color:var(--text-dim); cursor:pointer;
+}
+.mode-btn.active{background:var(--elevated); color:var(--text); box-shadow:var(--shadow)}
+.mode-btn:disabled{opacity:.4; cursor:not-allowed}
+.mode-btn:not(.active):not(:disabled):hover{color:var(--text)}
+
+/* sub-nav: the tab strip inside a module (Live/Demo's Chart|Dashboard|Trade|
+   Positions|History, Backtest's Run Backtest|Strategies) */
+.sub-nav{display:flex; gap:3px; background:var(--panel-2); padding:3px; border-radius:8px}
+.subnav-btn{
+  font-family:inherit; font-size:12px; font-weight:600; padding:6px 14px; border-radius:6px;
+  border:none; background:transparent; color:var(--text-dim); cursor:pointer; white-space:nowrap;
+}
+.subnav-btn.active{background:var(--elevated); color:var(--text); box-shadow:var(--shadow)}
+.subnav-btn:not(.active):hover{color:var(--text)}
+
+.icon-btn{
+  display:flex; align-items:center; justify-content:center; width:32px; height:32px;
+  border-radius:7px; border:1px solid var(--border); background:var(--panel-2);
+  color:var(--text-dim); font-size:14px; cursor:pointer;
+}
+.icon-btn:hover{color:var(--text); border-color:var(--border-2)}
+
+/* settings overlay: gear icon opens this instead of a sidebar section */
+.settings-overlay{position:fixed; inset:0; z-index:50; display:flex; justify-content:flex-end}
+.settings-overlay[hidden]{display:none}
+.settings-backdrop{position:absolute; inset:0; background:rgba(0,0,0,.55)}
+.settings-panel{
+  position:relative; width:min(720px, 92vw); height:100%; background:var(--bg);
+  border-left:1px solid var(--border); box-shadow:var(--shadow); display:flex; flex-direction:column;
+}
+.settings-panel-head{
+  display:flex; align-items:center; justify-content:space-between; padding:16px 20px;
+  border-bottom:1px solid var(--border); flex-shrink:0;
+}
+.settings-panel-title{font-size:15px; font-weight:700}
+.settings-panel-body{flex:1; overflow-y:auto; padding:18px 22px}
+
+/* ---------- content / views ---------- */
+.content{grid-area:content; overflow-y:auto; padding:18px 22px}
+.view{display:none; height:100%}
+.view.active{display:flex; flex-direction:column; gap:14px}
+
+.placeholder-card{
+  max-width:640px; margin:60px auto 0; background:var(--panel); border:1px solid var(--border);
+  border-radius:var(--radius); padding:28px 30px; box-shadow:var(--shadow); text-align:left;
+}
+.ph-title{font-size:16px; font-weight:700; margin-bottom:10px}
+.ph-body{font-size:13px; color:var(--text-dim); line-height:1.6}
+.ph-body b{color:var(--accent); font-weight:600}
+
+/* ---------- chart view ---------- */
+.chart-toolbar{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+.pillgroup{display:flex; gap:3px; background:var(--panel-2); padding:3px; border-radius:7px}
+.pill-btn{
+  font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:600; padding:6px 13px; border-radius:5px;
+  border:none; background:transparent; color:var(--text-dim); cursor:pointer;
+}
+.pill-btn.active{background:var(--elevated); color:var(--accent); box-shadow:var(--shadow)}
+.pill-btn:not(.active):hover{color:var(--text)}
+.chart-warning{
+  font-size:11.5px; color:var(--accent); background:var(--accent-soft); border:1px solid rgba(216,172,71,.3);
+  padding:5px 10px; border-radius:6px; flex:1; min-width:200px;
+}
+.chart-warning:empty{display:none}
+.risk-warning{
+  font-size:11.5px; color:var(--bad); background:var(--bad-bg); border:1px solid rgba(228,104,95,.35);
+  padding:8px 12px; border-radius:6px; line-height:1.5;
+}
+.ohlc-readout{
+  margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--text-dim);
+  display:flex; gap:12px; white-space:nowrap;
+}
+.ohlc-readout span b{color:var(--text); font-weight:600}
+.chart-panel{
+  flex:1; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:12px; min-height:420px; display:flex;
+}
+.chart-surface{width:100%; height:100%; min-height:400px}
+.live-badge{
+  display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.04em;
+  color:var(--good); background:var(--good-bg); border:1px solid rgba(62,203,62,.35);
+  padding:5px 10px; border-radius:6px;
+}
+.live-dot{width:6px; height:6px; border-radius:50%; background:var(--good); animation:live-pulse 1.4s ease-in-out infinite}
+@keyframes live-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+/* the feed is ticking, but not necessarily from a real broker — replay
+   (simulated source) gets its own color so it's never mistaken for MT5 */
+.live-badge.replay{color:var(--accent); background:var(--accent-soft); border-color:rgba(216,172,71,.35)}
+.live-badge.replay .live-dot{background:var(--accent)}
+@media (prefers-reduced-motion: reduce){ .live-dot{animation:none} }
+
+.chart-layout{flex:1; display:grid; grid-template-columns:1fr 280px; gap:14px; min-height:0}
+@media (max-width:1000px){ .chart-layout{grid-template-columns:1fr} }
+.chart-ticket{position:static}
+.chart-feed-bar{padding:8px 10px; margin-bottom:2px}
+.chart-position-box{
+  font-size:11.5px; color:var(--text-dim); background:var(--panel-2); border-radius:7px; padding:10px 12px; line-height:1.7;
+}
+.chart-position-box .cp-row{display:flex; justify-content:space-between}
+.chart-position-box .cp-close{margin-top:8px; width:100%}
+
+/* ---------- backtest view ---------- */
+.bt-layout{display:grid; grid-template-columns:280px 1fr; gap:16px; align-items:start; height:100%}
+.bt-config{
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+  padding:16px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:12px;
+  position:sticky; top:0;
+}
+.bt-field{display:flex; flex-direction:column; gap:5px}
+.bt-field label{font-size:11px; color:var(--text-dim); font-weight:600}
+.bt-field-row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.bt-field-row > div{display:flex; flex-direction:column; gap:5px}
+.bt-select, .bt-field input[type="number"], .bt-field input[type="date"], .bt-field input[type="text"]{
+  font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--text); background:var(--panel-2);
+  border:1px solid var(--border); border-radius:6px; padding:7px 9px; width:100%;
+}
+.bt-secondary-btn{
+  font-family:inherit; font-size:11.5px; font-weight:600; padding:7px 12px; border-radius:6px;
+  border:1px solid var(--border); background:var(--panel-2); color:var(--text-dim); cursor:pointer; white-space:nowrap;
+}
+.bt-secondary-btn:hover{color:var(--text); border-color:var(--border-2)}
+.bt-select:focus-visible, .bt-field input:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.bt-checkbox label{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--text-dim); font-weight:500}
+.bt-subhead{font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-faint); border-top:1px solid var(--border); padding-top:10px; margin-top:2px}
+.bt-params{display:flex; flex-direction:column; gap:8px; padding:10px; background:var(--panel-2); border-radius:7px}
+.bt-param{display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center}
+.bt-param label{font-size:11px; color:var(--text-dim)}
+.bt-param input[type="text"], .bt-param input[type="number"]{
+  font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--text); background:var(--elevated);
+  border:1px solid var(--border); border-radius:5px; padding:4px 7px; width:96px; text-align:right;
+}
+.bt-param input[type="checkbox"]{justify-self:end}
+.bt-save-row{display:flex; gap:8px}
+.bt-save-row input[type="text"]{
+  flex:1; font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--text);
+  background:var(--panel-2); border:1px solid var(--border); border-radius:6px; padding:7px 9px;
+}
+.bt-save-row button{
+  font-family:inherit; font-size:11.5px; font-weight:600; padding:7px 12px; border-radius:6px;
+  border:1px solid var(--border); background:var(--panel-2); color:var(--text-dim); cursor:pointer; white-space:nowrap;
+}
+.bt-save-row button:hover{color:var(--text); border-color:var(--border-2)}
+/* ---------- strategy builder (no-code condition rows) ---------- */
+.builder-hint{background:var(--panel-2); border-radius:7px; padding:10px 12px; line-height:1.6}
+.builder-indicator-list, .builder-condition-list{display:flex; flex-direction:column; gap:6px; margin-bottom:8px}
+.builder-ind-row, .builder-cond-row{
+  display:grid; grid-template-columns:1.1fr auto; gap:8px; align-items:start;
+  background:var(--panel-2); border-radius:7px; padding:8px 10px;
+}
+.builder-ind-row-fields, .builder-cond-row-fields{display:flex; flex-wrap:wrap; gap:6px; align-items:center; flex:1}
+.builder-ind-row-fields .bt-select, .builder-cond-row-fields .bt-select{width:auto; min-width:90px}
+.builder-ind-row-fields input, .builder-cond-row-fields input{width:76px}
+.builder-ind-label{font-size:11px; font-weight:700; color:var(--accent); font-family:"IBM Plex Mono",monospace; align-self:center}
+.builder-param-inline{display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-dim)}
+.builder-remove-btn{
+  border:none; background:transparent; color:var(--text-faint); cursor:pointer; font-size:14px;
+  width:22px; height:22px; border-radius:5px; flex-shrink:0;
+}
+.builder-remove-btn:hover{color:var(--bad); background:var(--bad-bg)}
+.builder-empty-note{font-size:11.5px; color:var(--text-faint); padding:4px 2px}
+
+/* ---------- live activity feed ---------- */
+.activity-feed{display:flex; flex-direction:column; gap:6px; max-height:340px; overflow-y:auto}
+.activity-row{
+  display:flex; gap:10px; align-items:baseline; padding:7px 10px; border-radius:6px;
+  background:var(--panel-2); font-size:12px;
+}
+.activity-time{font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--text-faint); flex-shrink:0; width:64px}
+.activity-kind{
+  flex-shrink:0; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+  padding:2px 6px; border-radius:4px; align-self:center;
+}
+.activity-kind.info{background:var(--panel); color:var(--text-faint)}
+.activity-kind.signal{background:var(--accent-soft); color:var(--accent)}
+.activity-kind.fill{background:rgba(57,135,229,.15); color:#7fb0ee}
+.activity-kind.exit{background:var(--good-bg); color:var(--good)}
+.activity-kind.exit.neg{background:var(--bad-bg); color:var(--bad)}
+.activity-kind.blocked{background:var(--bad-bg); color:var(--bad)}
+.activity-message{color:var(--text-dim); flex:1}
+
+/* discrete strategy signals (e.g. HTF bias) as a readable badge instead of
+   a barely-visible flat line on an oscillator chart */
+.state-badges{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px}
+.state-badges:empty{display:none}
+.state-badge{
+  display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600;
+  padding:4px 9px; border-radius:6px; background:var(--panel-2); color:var(--text-dim);
+}
+.state-badge .dot{width:7px; height:7px; border-radius:50%; flex-shrink:0}
+.state-badge.bullish{color:var(--good)}
+.state-badge.bullish .dot{background:var(--good)}
+.state-badge.bearish{color:var(--bad)}
+.state-badge.bearish .dot{background:var(--bad)}
+.state-badge.neutral .dot{background:var(--text-faint)}
+
+.bt-danger-btn{color:var(--bad) !important}
+.bt-danger-btn:hover{border-color:var(--bad) !important}
+.bt-run-btn{
+  font-family:inherit; font-size:13px; font-weight:700; padding:11px; border-radius:7px; border:none;
+  background:var(--accent); color:#1a1408; cursor:pointer; margin-top:4px;
+}
+.bt-run-btn:hover{filter:brightness(1.08)}
+.bt-run-btn:disabled{opacity:.5; cursor:wait}
+
+.bt-results{display:flex; flex-direction:column; gap:14px; min-width:0}
+.bt-empty{
+  margin:60px auto 0; max-width:420px; text-align:center; color:var(--text-faint); font-size:13px; line-height:1.6;
+}
+.bt-empty b{color:var(--accent)}
+.bt-results-body{display:flex; flex-direction:column; gap:14px}
+.bt-panel{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow)}
+.bt-panel-title{font-size:13px; font-weight:700; margin-bottom:10px; display:flex; align-items:baseline; gap:8px}
+.bt-panel-note{font-size:11px; font-weight:400; color:var(--text-faint)}
+.mini-chart{width:100%; height:180px}
+.mini-chart-small{height:100px}
+.bt-price-chart{height:380px; width:100%}
+
+.stat-tiles{display:grid; grid-template-columns:repeat(auto-fit, minmax(118px,1fr)); gap:10px}
+.stat-tile{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; box-shadow:var(--shadow)}
+.stat-tile .st-val{font-family:"IBM Plex Mono",monospace; font-size:19px; font-weight:600; line-height:1.1}
+.stat-tile .st-lbl{font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.05em; margin-top:4px}
+
+.bt-split-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+@media (max-width:1100px){ .bt-split-grid{grid-template-columns:1fr} .bt-layout{grid-template-columns:1fr} .bt-config{position:static} }
+
+.best-worst{display:flex; flex-direction:column; gap:10px}
+.bw-row{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-radius:7px; background:var(--panel-2)}
+.bw-row.best{border-left:3px solid var(--good)}
+.bw-row.worst{border-left:3px solid var(--bad)}
+.bw-period{font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:600}
+.bw-detail{font-size:11px; color:var(--text-dim)}
+
+.bt-trade-scroll{max-height:360px}
+
+/* History view: let the panel and its table fill the whole remaining page
+   height instead of sitting in a short fixed-height box with empty space
+   below it — .hist-fill's higher specificity overrides .bt-trade-scroll's
+   360px cap for this one table only. */
+.hist-panel{flex:1; display:flex; flex-direction:column; min-height:0}
+.hist-filters{display:flex; gap:8px; margin-bottom:10px}
+.hist-filters .bt-select{width:auto; min-width:140px}
+.hist-panel .hist-fill{flex:1; max-height:none; min-height:0}
+.trade-row{cursor:pointer}
+.trade-row:hover{background:var(--panel-2)}
+.trade-row.selected{background:var(--accent-soft)}
+
+.hist-strategy-row{cursor:pointer}
+.hist-strategy-row:hover{background:var(--panel-2)}
+.hist-strategy-row.selected{background:var(--accent-soft)}
+
+/* generic data tables (backtest splits + trade log) */
+.table-scroll{max-height:280px; overflow:auto; border:1px solid var(--border); border-radius:7px}
+table{width:100%; border-collapse:collapse; font-size:11.5px}
+thead th{
+  position:sticky; top:0; background:var(--panel-2); text-align:left; padding:7px 10px;
+  font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-faint); font-weight:600;
+  border-bottom:1px solid var(--border); z-index:1;
+}
+thead th.num, tbody td.num{text-align:right}
+tbody td{padding:6px 10px; border-bottom:1px solid var(--border); font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
+tbody tr:last-child td{border-bottom:none}
+.pill-tag{display:inline-flex; align-items:center; gap:5px; padding:2px 7px; border-radius:5px; font-size:10.5px; font-weight:600}
+.pill-tag.long{background:var(--good-bg); color:var(--good)}
+.pill-tag.short{background:var(--bad-bg); color:var(--bad)}
+.pill-tag.strategy-tag{background:rgba(217,172,71,0.16); color:var(--accent); font-weight:600}
+.pill-tag.manual-tag{background:var(--panel-2); color:var(--text-faint); font-weight:500}
+
+/* ---------- strategies view ---------- */
+.strat-layout{display:grid; grid-template-columns:300px 1fr; gap:16px; align-items:start}
+.strat-list-panel{min-width:0}
+.compare-hint{margin-bottom:10px}
+.strat-cards{display:flex; flex-direction:column; gap:8px; max-height:520px; overflow-y:auto}
+.strat-card{
+  display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center;
+  background:var(--panel-2); border:1px solid var(--border); border-radius:7px; padding:10px 12px;
+}
+.strat-card-check input{width:16px; height:16px; accent-color:var(--accent)}
+.strat-card-name{font-size:12.5px; font-weight:600}
+.strat-card-class{font-size:10.5px; color:var(--accent); font-family:"IBM Plex Mono",monospace; margin-top:2px}
+.strat-card-params{font-size:10.5px; color:var(--text-faint); margin-top:3px; font-family:"IBM Plex Mono",monospace}
+.strat-card-actions{display:flex; gap:4px}
+.strat-card-actions button{
+  width:26px; height:26px; border-radius:5px; border:1px solid var(--border); background:var(--elevated);
+  color:var(--text-dim); cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center;
+}
+.strat-card-actions button:hover{color:var(--text); border-color:var(--border-2)}
+
+.compare-controls{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:14px}
+.compare-dates{display:flex; gap:10px}
+.compare-dates > div{display:flex; flex-direction:column; gap:4px}
+.compare-dates label{font-size:10.5px; color:var(--text-dim); font-weight:600}
+.compare-dates input{
+  font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--text); background:var(--panel-2);
+  border:1px solid var(--border); border-radius:6px; padding:6px 9px;
+}
+.compare-run-btn{margin-left:auto; margin-top:0; padding:9px 18px}
+.legend{display:flex; gap:16px; flex-wrap:wrap; margin-bottom:8px}
+.legend .legend-item{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim)}
+.legend .sw{width:16px; height:3px; border-radius:2px; display:inline-block}
+
+@media (max-width:1100px){ .strat-layout{grid-template-columns:1fr} }
+
+/* ---------- settings view ---------- */
+.settings-layout{display:flex; flex-direction:column; gap:14px; max-width:640px}
+.settings-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px}
+.settings-grid label{font-size:11px; color:var(--text-dim); font-weight:600; display:block; margin-bottom:5px}
+.settings-grid input{
+  width:100%; font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--text); background:var(--panel-2);
+  border:1px solid var(--border); border-radius:6px; padding:7px 9px;
+}
+.calc-result{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:4px}
+.calc-result .cr-tile{background:var(--panel-2); border-radius:7px; padding:10px 12px; text-align:center}
+.calc-result .cr-val{font-family:"IBM Plex Mono",monospace; font-size:16px; font-weight:600}
+.calc-result .cr-lbl{font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.05em; margin-top:3px}
+.calc-result.warn .cr-val{color:var(--bad)}
+.live-feed-status{
+  font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:600; color:var(--text-dim);
+  margin:10px 0; padding:8px 10px; background:var(--panel-2); border-radius:6px;
+}
+.live-feed-status.on{color:var(--good)}
+
+/* ---------- dashboard / paper trading ---------- */
+.feed-bar{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+  padding:10px 14px; box-shadow:var(--shadow);
+}
+.feed-status{font-size:12px; font-weight:600; font-family:"IBM Plex Mono",monospace; color:var(--text-dim)}
+.feed-status.on{color:var(--good)}
+.feed-status.off{color:var(--text-faint)}
+#dashSimTime{margin-left:auto}
+
+.paper-layout{display:grid; grid-template-columns:300px 1fr; gap:16px; align-items:start}
+@media (max-width:1100px){ .paper-layout{grid-template-columns:1fr} }
+.price-ticker{
+  font-family:"IBM Plex Mono",monospace; font-size:18px; font-weight:600; text-align:center;
+  background:var(--panel-2); border-radius:7px; padding:12px; margin-bottom:4px;
+}
+.price-ticker .bid{color:var(--bad)} .price-ticker .ask{color:var(--good)}
+.price-ticker .sep{color:var(--text-faint); font-size:13px; margin:0 6px}
+.dir-pills .pill-btn.active[data-dir="1"]{color:var(--good)}
+.dir-pills .pill-btn.active[data-dir="-1"]{color:var(--bad)}
+.dash-mini-action{
+  font-family:inherit; font-size:10.5px; font-weight:600; padding:4px 9px; border-radius:5px;
+  border:1px solid var(--border); background:var(--elevated); color:var(--text-dim); cursor:pointer;
+}
+.dash-mini-action:hover{color:var(--bad); border-color:var(--bad)}
+.auto-running-row{
+  display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+  padding:10px 0; border-bottom:1px solid var(--border);
+}
+.auto-running-row:last-child{border-bottom:none}
+.auto-running-info b{font-size:13px}
+.auto-strategy-list{
+  max-height:260px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; background:var(--elevated);
+}
+.auto-strategy-item{
+  display:flex; align-items:flex-start; gap:10px; padding:9px 12px; border-bottom:1px solid var(--border); cursor:pointer;
+}
+.auto-strategy-item:last-child{border-bottom:none}
+.auto-strategy-item:hover{background:var(--panel-2)}
+.auto-strategy-item input[type="checkbox"]{margin-top:2px; cursor:pointer}
+.auto-strategy-item .asi-name{font-size:13px; font-weight:600}
+.auto-strategy-item .asi-summary{font-size:11px; color:var(--text-faint); margin-top:2px}
+.auto-setup-detail{
+  padding:8px 10px; margin:-4px 0 8px; background:var(--elevated); border:1px solid var(--border); border-radius:6px;
+}
+.setup-grid{display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; margin-top:4px}
+.setup-kv{display:flex; justify-content:space-between; gap:8px; font-size:11px; padding:2px 0}
+.setup-kv span{color:var(--text-faint)}
+.setup-kv b{font-weight:600; text-align:right}
+@media (max-width:900px){.setup-grid{grid-template-columns:1fr}}
+
+@media (max-width:900px){
+  body{grid-template-columns: 72px 1fr}
+  .brand-text, .nav-item span:last-child, .build-note, .build-tag{display:none}
+  .brand{justify-content:center}
+  .nav-item{justify-content:center}
+}

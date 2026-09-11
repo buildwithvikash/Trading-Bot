@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in — Gold Trading Terminal</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/css/terminal.css?v=11">
+<style>
+  body{display:flex; align-items:center; justify-content:center; min-height:100vh}
+  .login-card{
+    width:min(360px, 92vw); background:var(--panel); border:1px solid var(--border);
+    border-radius:var(--radius); box-shadow:var(--shadow); padding:28px 26px;
+  }
+  .login-brand{display:flex; align-items:center; gap:10px; margin-bottom:22px}
+  .login-title{font-size:15px; font-weight:700; margin-bottom:4px}
+  .login-sub{font-size:12px; color:var(--text-faint); margin-bottom:20px}
+  .login-field{display:flex; flex-direction:column; gap:5px; margin-bottom:14px}
+  .login-field label{font-size:11px; color:var(--text-dim); font-weight:600}
+  .login-field input{
+    font-family:inherit; font-size:13px; color:var(--text); background:var(--panel-2);
+    border:1px solid var(--border); border-radius:6px; padding:9px 10px; width:100%;
+  }
+  .login-field input:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+  .login-submit{
+    width:100%; margin-top:6px; font-family:inherit; font-size:13px; font-weight:700;
+    padding:10px; border-radius:7px; border:none; background:var(--accent); color:#1a1408; cursor:pointer;
+  }
+  .login-submit:disabled{opacity:.6; cursor:not-allowed}
+  .login-error{font-size:12px; color:var(--bad); margin-top:12px; min-height:16px}
+</style>
+</head>
+<body>
+
+<div class="login-card">
+  <div class="login-brand">
+    <div class="brand-mark">XAU</div>
+    <div class="brand-text">
+      <div class="brand-name">Gold Terminal</div>
+      <div class="brand-sub">XAU/USD research &amp; sim</div>
+    </div>
+  </div>
+  <div class="login-title">Sign in</div>
+  <div class="login-sub">This is a private trading terminal — sign in to continue.</div>
+  <form id="loginForm">
+    <div class="login-field">
+      <label for="loginUser">Username</label>
+      <input type="text" id="loginUser" autocomplete="username" required autofocus>
+    </div>
+    <div class="login-field">
+      <label for="loginPass">Password</label>
+      <input type="password" id="loginPass" autocomplete="current-password" required>
+    </div>
+    <button type="submit" class="login-submit" id="loginSubmit">Sign in</button>
+    <div class="login-error" id="loginError"></div>
+  </form>
+</div>
+
+<script>
+  const form = document.getElementById('loginForm');
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginSubmit');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errEl.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: document.getElementById('loginUser').value,
+          password: document.getElementById('loginPass').value,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || 'Invalid username or password');
+      }
+      const params = new URLSearchParams(window.location.search);
+      window.location.href = params.get('next') || '/';
+    } catch (err) {
+      errEl.textContent = err.message;
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+    }
+  });
+</script>
+
+</body>
+</html>
