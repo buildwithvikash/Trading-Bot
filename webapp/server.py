@@ -91,4 +91,8 @@ if __name__ == "__main__":
     # default stays 127.0.0.1:8000 exactly as before.
     port = int(os.environ.get("PORT", 8000))
     host = os.environ.get("HOST", "0.0.0.0" if "PORT" in os.environ else "127.0.0.1")
-    uvicorn.run(app, host=host, port=port)
+    # Railway terminates TLS at its edge and proxies plain HTTP to this
+    # container, so request.url.scheme would otherwise always read "http"
+    # (even for a visitor on https://) — proxy_headers trusts Railway's own
+    # X-Forwarded-Proto so the login cookie's Secure flag is set correctly.
+    uvicorn.run(app, host=host, port=port, proxy_headers=True, forwarded_allow_ips="*")
