@@ -8,10 +8,15 @@ than introducing a second database.
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "terminal.sqlite3"
+# Overridable via DB_PATH so a deploy can point this at a mounted volume
+# WITHOUT that volume's mount path colliding with data/'s read-only CSV
+# price history baked into the image — an empty volume mounted directly on
+# top of data/ hides those CSVs, silently falling back to synthetic data.
+DB_PATH = Path(os.environ.get("DB_PATH", str(Path(__file__).resolve().parent.parent / "data" / "terminal.sqlite3")))
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS strategies (
