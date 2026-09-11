@@ -31,7 +31,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from webapp import auth, db
-from webapp.routers import auth_router, backtest, market, paper, risk, strategies
+from webapp.routers import admin_router, auth_router, backtest, market, paper, risk, strategies
 
 FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 
@@ -64,6 +64,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 app.add_middleware(AuthMiddleware)
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
+app.include_router(admin_router.router, prefix="/api/admin", tags=["admin"])
 app.include_router(market.router, prefix="/api/market", tags=["market"])
 app.include_router(backtest.router, prefix="/api/backtest", tags=["backtest"])
 app.include_router(strategies.router, prefix="/api/strategies", tags=["strategies"])
