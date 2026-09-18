@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -38,7 +39,14 @@ FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 db.init_db()
 auth.purge_expired_sessions()
 
-app = FastAPI(title="Gold Trading Terminal")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    paper.resume_saved_autotrades()
+    yield
+
+
+app = FastAPI(title="Gold Trading Terminal", lifespan=lifespan)
 
 # paths reachable with no session — the login page itself, the endpoint that
 # creates a session, and the handful of static assets the login page needs
@@ -80,11 +88,6 @@ def login_page():
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
-
-
-@app.on_event("startup")
-def _resume_autotrades() -> None:
-    paper.resume_saved_autotrades()
 
 
 if __name__ == "__main__":
