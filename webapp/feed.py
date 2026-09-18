@@ -100,8 +100,17 @@ class MarketFeed:
                     return
                 self._i += 1
                 if self._i >= len(self._df):
-                    self._i = 0
+                    # Same bug class as webapp.autotrade.AutoTrader._sim_loop
+                    # (see its comment): wrapping back to _i = 0 replays
+                    # 2020-era prices under bars that everything downstream
+                    # treats as "now" — a manual close or the shared harmless
+                    # fill/close check (_on_tick) would then mark a position
+                    # entered at ~$4,300 against a ~$1,970 bar and produce a
+                    # five-figure phantom P&L. Stop instead of looping.
+                    self._running = False
                     self._cycles += 1
+                    print(f"[feed] reached the end of the local historical dataset in simulated mode — stopped instead of looping back to the start.")
+                    return
                 bar = self._sim_bar()
             self._notify(bar)
             time.sleep(self.seconds_per_bar)
@@ -213,7 +222,17 @@ class MarketFeed:
     # ------------------------------------------------------------------ #
     def current_bar(self) -> dict | None:
         with self._lock:
-            return self._live_bar if self.source == "biquote" else self._sim_bar()
+            if self.source == "biquote":
+                return self._live_bar
+            # Unlike the biquote branch (None until a real tick arrives),
+            # _sim_bar() used to be called unconditionally — so before the
+            # feed was ever start()ed, this silently returned bar index 0 of
+            # the local historical dataset (2020-09-01, ~$1,968) as if it
+            # were the current price. Every caller (get_positions' floating
+            # P&L, the manual order ticket, manual position close) trusted
+            # that as real, live data. Only serve it once the replay is
+            # actually running.
+            return self._sim_bar() if self._running else None
 
     def current_forming_bar(self) -> dict | None:
         """The in-progress bar for the Chart view to poll for a genuinely

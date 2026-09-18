@@ -676,6 +676,8 @@ def _risk_block_reason(conn, settings: dict, wallet: dict, key: str) -> str | No
     must respect the same daily-loss/drawdown circuit breakers, scoped to
     the wallet placing the order so one strategy hitting its daily loss
     limit doesn't halt every other strategy's wallet too."""
+    if wallet["balance"] <= 0:
+        return "wallet balance has hit zero — auto-trading halted for this wallet"
     today = datetime.now(timezone.utc).date().isoformat()
     if settings["max_daily_loss_pct"] is not None:
         today_pnl = conn.execute(

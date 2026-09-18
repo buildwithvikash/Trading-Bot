@@ -296,6 +296,17 @@ window.PaperView = (function () {
   function renderAutoSelectedCount() {
     const n = selectedAutoConfigs.size;
     document.getElementById('autoSelectedCount').textContent = n ? `${n} selected` : '';
+    const allBtn = document.getElementById('autoSelectAllBtn');
+    if (allBtn) allBtn.textContent = (autoConfigs.length && n === autoConfigs.length) ? 'Clear all' : 'Select all';
+  }
+
+  function toggleSelectAllAuto() {
+    if (selectedAutoConfigs.size === autoConfigs.length) {
+      selectedAutoConfigs.clear();
+    } else {
+      autoConfigs.forEach(cfg => selectedAutoConfigs.add(cfg.id));
+    }
+    renderAutoStrategyList();
   }
 
   function renderAutoStrategyList() {
@@ -507,6 +518,7 @@ window.PaperView = (function () {
 
   async function initAutoTrade() {
     document.getElementById('autoToggle').addEventListener('click', startAutoTrade);
+    document.getElementById('autoSelectAllBtn').addEventListener('click', toggleSelectAllAuto);
     await refreshAutoConfigs();
     await refreshAutoStatus().catch(err => console.error('initAutoTrade: failed to load status', err));
   }

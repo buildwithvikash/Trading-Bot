@@ -388,7 +388,26 @@ class AutoTrader:
             try:
                 self.last_i += 1
                 if self.last_i >= len(self.df):
-                    self.last_i = 0
+                    # Reached the end of the local historical dataset. This
+                    # USED to wrap back to self.last_i = 0 and keep replaying
+                    # from 2020 forever — a wallet left running for more than
+                    # one lap (~5 days at 2s/bar for the 6-year dataset) would
+                    # silently start trading 2020-era prices while everything
+                    # downstream (entry_time stamps from a later bar, wallet
+                    # balance, ATR) still reflected "now". That produced
+                    # nonsense signals with a stop/target computed off a
+                    # ~$1,900 basis filled against a ~$4,300 reference price —
+                    # a five-figure phantom loss/gain in a single trade. Stop
+                    # cleanly instead: no more bars to play without lookahead.
+                    self.enabled = False
+                    self._running = False
+                    ACTIVITY.add(
+                        "error",
+                        f"{self.strategy_id} (wallet '{self.wallet_key}'): reached the end of the "
+                        "local historical dataset in simulated mode (no live biquote feed) — stopped "
+                        "instead of looping back to the start. Restart the wallet to replay again.",
+                    )
+                    return
                 row = self.df.iloc[self.last_i]
                 ts = self.df.index[self.last_i]
                 bar = {
@@ -512,6 +531,26 @@ class AutoTrader:
         take_profit = order.tp1 if order.tp1 is not None else order.tp2
         risk_per_oz = abs(ref_price - order.stop_loss)
         if risk_per_oz <= 0:
+            return
+
+        # Sanity guard: the stop/target a strategy computes and the price this
+        # order actually fills at should come from (nearly) the same moment,
+        # so the stop distance should be a small fraction of price — normal
+        # ATR-based stops on gold intraday bars run well under 1%. A stop
+        # this far from the fill price means the signal was generated off a
+        # stale or otherwise bad reference bar (e.g. a data-feed hiccup, or a
+        # replay that fell behind the live price) rather than a real setup.
+        # Reject rather than open a position sized against a nonsense risk
+        # distance — this is what let a single bad bar turn into a
+        # five-figure phantom loss/gain before this guard existed.
+        MAX_STOP_DISTANCE_PCT = 0.08
+        if ref_price and risk_per_oz / ref_price > MAX_STOP_DISTANCE_PCT:
+            ACTIVITY.add(
+                "error",
+                f"{self.strategy_id} (wallet '{self.wallet_key}'): rejected signal — stop distance "
+                f"{risk_per_oz:.2f} is {100 * risk_per_oz / ref_price:.1f}% of price {ref_price:.2f} "
+                f"(> {100 * MAX_STOP_DISTANCE_PCT:.0f}% sanity limit), likely a stale/bad reference bar",
+            )
             return
 
         from webapp.routers.paper import _get_wallet  # deferred — see _process_bar

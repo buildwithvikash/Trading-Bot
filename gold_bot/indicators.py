@@ -363,3 +363,27 @@ def zigzag_pivots(df: pd.DataFrame, atr_col: pd.Series, atr_mult: float = 2.0):
         pd.Series(pivot_high, index=df.index),
         pd.Series(pivot_low, index=df.index),
     )
+
+
+def compute_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute standard set of indicators (EMA 20/50/200, RSI, MACD, ATR) on a price DataFrame."""
+    out = df.copy()
+    if out.empty or "close" not in out.columns:
+        return out
+
+    close = out["close"]
+    out["ema_20"] = ema(close, 20)
+    out["ema_50"] = ema(close, 50)
+    out["ema_200"] = ema(close, 200)
+    out["rsi"] = rsi(close, 14)
+    
+    macd_df = macd(close, 12, 26, 9)
+    out["macd"] = macd_df["macd"]
+    out["macd_signal"] = macd_df["signal"]
+    out["macd_hist"] = macd_df["hist"]
+    
+    if "high" in out.columns and "low" in out.columns:
+        out["atr"] = atr(out, 14)
+        
+    return out
+

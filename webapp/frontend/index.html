@@ -21,7 +21,9 @@
     <button type="button" class="nav-item" data-module="live" title="Attempts a live biquote.io feed; falls back to the simulated one if unreachable"><span class="nav-icon">●</span><span class="nav-label">Live</span></button>
     <button type="button" class="nav-item active" data-module="demo" title="Paper trading against the simulated feed"><span class="nav-icon">◎</span><span class="nav-label">Demo</span></button>
     <button type="button" class="nav-item" data-module="backtest"><span class="nav-icon">↻</span><span class="nav-label">Backtest</span></button>
+    <button type="button" class="nav-item" data-module="ai" title="Autonomous AI Quant Engine & Claude Market Assistant"><span class="nav-icon">✨</span><span class="nav-label">AI Copilot</span></button>
   </nav>
+
   <div class="sidebar-foot">
     <div class="build-tag">All 6 phases live</div>
     <div class="build-note">Live and Demo share the same play-money paper account and views (Chart, Dashboard, Trade, Positions, History) — they only differ in which feed source they trade against. Real trading is never enabled.</div>
@@ -395,7 +397,9 @@
       <div class="bt-panel-title">Auto-trade a strategy</div>
       <div class="bt-panel-note">Check as many strategies as you want — built-in or built with the no-code rule builder — and start them together. Each runs fully independently: its own wallet, its own declared timeframe, entries/stops/targets/trailing stops/OCO all handled for you. Uses live biquote.io prices when connected, otherwise the simulated replay as a fallback. Still 100% virtual money — nothing here reaches a real broker.</div>
       <div class="bt-field">
-        <label>Saved strategies <span class="bt-panel-note" id="autoSelectedCount"></span></label>
+        <label>Saved strategies <span class="bt-panel-note" id="autoSelectedCount"></span>
+          <button type="button" class="dash-mini-action" id="autoSelectAllBtn" style="margin-left:8px">Select all</button>
+        </label>
         <div id="autoStrategyList" class="auto-strategy-list"></div>
       </div>
       <div class="bt-field-row">
@@ -503,8 +507,58 @@
     </div>
   </section>
 
+  <section class="view" id="view-ai">
+
+    <div class="ai-quant-hero">
+      <div class="ai-quant-info">
+        <h2 class="ai-quant-title">🤖 Autonomous AI Quant Engine</h2>
+        <p class="ai-quant-desc">Powered by <strong>Anthropic Claude Opus</strong>. Automatically analyzes live XAU/USD market charts, discovers & optimizes quantitative strategies, executes 1-year backtests, activates high-conviction strategies into live Demo paper trading, and generates complete audit reports.</p>
+      </div>
+      <div class="ai-quant-actions">
+        <button type="button" class="bt-run-btn ai-sparkle-btn" id="runAutoQuantBtn">✨ Run Autonomous AI Quant Engine</button>
+        <button type="button" class="bt-secondary-btn" id="aiScanMarketBtn">⚡ 1-Click Market Scan</button>
+      </div>
+    </div>
+
+    <div class="ai-status-card" id="autoQuantStatus" hidden></div>
+
+    <div class="bt-panel ai-report-panel" id="autoQuantReport" hidden></div>
+
+    <div class="ai-chat-layout">
+      <div class="bt-panel ai-chat-panel">
+        <div class="bt-panel-title">
+          <span>✨ Claude AI Market Analyst &amp; Strategy Assistant</span>
+          <span class="ai-badge">claude-opus-4-7</span>
+        </div>
+        
+        <div class="ai-chips-bar">
+          <button type="button" class="ai-chip-btn" data-prompt="Analyze current XAU/USD gold trend and momentum indicators.">📊 Analyze Trend</button>
+          <button type="button" class="ai-chip-btn" data-prompt="Evaluate open paper positions and recommend stop loss / profit target adjustments.">🛡️ Audit Positions</button>
+          <button type="button" class="ai-chip-btn" data-prompt="Suggest optimal risk per trade and trailing ATR settings for gold scalping.">⚙️ Risk Guidance</button>
+          <button type="button" class="ai-chip-btn" data-prompt="How can I optimize Trend Pullback strategy parameters for higher Sharpe ratio on 15m gold?">🎯 Strategy Tuning</button>
+          <button type="button" class="ai-chip-btn ai-clear-btn" id="aiClearBtn">🗑️ Clear Chat</button>
+        </div>
+
+
+        <div class="ai-chat-box" id="aiChatBox">
+          <div class="ai-msg ai-msg-bot">
+            <div class="ai-msg-header"><span class="ai-badge">Claude AI</span></div>
+            <div class="ai-msg-body">
+              Hello! I am your <strong>Quantitative AI Assistant</strong> for the Gold Trading Terminal. Ask me anything about XAU/USD price action, risk management, or strategy optimization — or click <strong>"Run Autonomous AI Quant Engine"</strong> above to let me discover, backtest on 1-year data, and auto-trade new strategies for you!
+            </div>
+          </div>
+        </div>
+
+        <div class="ai-chat-input-row">
+          <input type="text" id="aiInput" class="ai-input" placeholder="Ask Claude about gold market signals, indicators, or strategy rules…">
+          <button type="button" id="aiSendBtn" class="bt-run-btn ai-send-btn">Send</button>
+        </div>
+      </div>
+    </div>
+  </section>
 
 </main>
+
 
 <div class="settings-overlay" id="settingsOverlay" hidden>
   <div class="settings-backdrop" id="settingsBackdrop"></div>
@@ -575,6 +629,8 @@
 <script src="/js/strategies.js?v=4"></script>
 <script src="/js/settings.js?v=3"></script>
 <script src="/js/paper.js?v=17"></script>
+<script src="/js/ai.js?v=1"></script>
 <script src="/js/app.js?v=22"></script>
 </body>
+
 </html>

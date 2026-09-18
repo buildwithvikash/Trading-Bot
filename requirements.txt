@@ -10,5 +10,7 @@ python-dotenv>=1.0
 python-multipart>=0.0.9
 biquote>=0.3.0
 signalrcore>=1.0.2
+anthropic>=0.18.0
 # live_bot.py only (Windows):
 # MetaTrader5>=5.0.45
+

@@ -45,10 +45,18 @@
         { id: 'strategies', label: 'Strategies' },
       ],
     },
+    ai: {
+      label: 'AI Copilot', feedSource: null,
+      tabs: [
+        { id: 'ai', label: 'AI Quant Engine & Assistant' },
+      ],
+    },
   };
 
+
   let currentModule = 'demo';
-  const lastTabByModule = { live: 'charts', demo: 'charts', backtest: 'backtest' };
+  const lastTabByModule = { live: 'charts', demo: 'charts', backtest: 'backtest', ai: 'ai' };
+
 
   // Remember where the user was so a browser refresh lands back on the
   // same module/tab instead of always resetting to Demo → Chart.
