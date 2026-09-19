@@ -247,19 +247,17 @@
   async function loadBars() {
     const token = ++loadBarsToken;
     const tf = currentTf;
-    // This chart's history always comes from the local historical dataset
-    // regardless of feed source or timeframe. The live feed (when
-    // connected) supplies the newest tip of the chart via
-    // liveTick()/applyLiveBar() at whatever timeframe is being viewed —
-    // biquote's own recent real bars are also used server-side to seed
-    // auto-trade's indicators (see webapp/autotrade.py), not drawn here.
+    // The chart shows only real recent bars from biquote.io (/api/market/live-bars);
+    // liveTick()/applyLiveBar() then keep the newest candle moving.
     chartWarningEl.textContent = '';
 
-    const res = await fetch(`/api/market/bars?tf=${tf}&limit=6000`);
+    const res = await fetch(`/api/market/live-bars?tf=${tf}`);
     const data = await res.json();
     if (token !== loadBarsToken) return;
     if (data.error) {
       chartWarningEl.textContent = data.error;
+      lastBars = [];
+      chart.setData([]);
       return;
     }
     chartWarningEl.textContent = data.warning || '';

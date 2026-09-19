@@ -11,7 +11,7 @@ import pandas as pd
 from fastapi import APIRouter, Query
 
 from gold_bot.data import load_best_available, resample, slice_period
-from webapp import goldprice
+from webapp import biquote_client, goldprice
 
 router = APIRouter()
 
@@ -108,6 +108,27 @@ def get_bars(
         "warning": warning,
         "bars": _bars_payload(out),
     }
+
+
+@router.get("/live-bars")
+def get_live_bars(tf: str = Query("15min")):
+    """Recent real bars straight from biquote.io (forming bar included), for
+    the live chart. No local/historical data is mixed in."""
+    if tf not in TF_MAP:
+        return {"error": f"unknown timeframe '{tf}'", "timeframes": list(TF_MAP.keys())}
+    raw = biquote_client.get_ohlc(tf, limit=5000)
+    if not raw:
+        return {"error": "Live market data is unavailable right now (biquote.io unreachable).", "bars": []}
+    bars = [
+        {
+            "time": int(pd.Timestamp(b["openTime"]).timestamp()),
+            "open": float(b["open"]), "high": float(b["high"]),
+            "low": float(b["low"]), "close": float(b["close"]),
+            "volume": float(b.get("tickVolume") or 0),
+        }
+        for b in raw
+    ]
+    return {"tf": tf, "warning": None, "bars": bars}
 
 
 @router.get("/spot-check")
