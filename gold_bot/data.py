@@ -54,7 +54,11 @@ def load_csv(
         ts = df[cand[0]].astype(str)
         df = df.drop(columns=[cand[0]])
 
-    index = pd.to_datetime(ts, dayfirst=dayfirst, format="mixed")
+    # Newer pandas applies dayfirst to ISO strings too (2026-09-01 -> Jan 9), so ISO goes first.
+    try:
+        index = pd.to_datetime(ts, format="ISO8601")
+    except (ValueError, TypeError):
+        index = pd.to_datetime(ts, dayfirst=dayfirst, format="mixed")
     df.index = index
 
     rename = {}
