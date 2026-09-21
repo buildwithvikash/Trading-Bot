@@ -31,8 +31,8 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from webapp import auth, db
-from webapp.routers import admin_router, ai, auth_router, backtest, market, paper, risk, strategies
+from webapp import auth, db, optimizer
+from webapp.routers import admin_router, ai, optimizer as optimizer_router, auth_router, backtest, market, paper, risk, strategies
 
 FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 
@@ -43,6 +43,7 @@ auth.purge_expired_sessions()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     paper.resume_saved_autotrades()
+    optimizer.start_scheduler()
     yield
 
 
@@ -79,6 +80,7 @@ app.include_router(strategies.router, prefix="/api/strategies", tags=["strategie
 app.include_router(risk.router, prefix="/api/risk", tags=["risk"])
 app.include_router(paper.router, prefix="/api/paper", tags=["paper"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
+app.include_router(optimizer_router.router, prefix="/api/optimizer", tags=["optimizer"])
 
 
 

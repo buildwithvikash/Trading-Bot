@@ -49,6 +49,7 @@
       label: 'AI Copilot', feedSource: null,
       tabs: [
         { id: 'ai', label: 'AI Quant Engine & Assistant' },
+        { id: 'optimizer', label: 'Daily Optimizer' },
       ],
     },
   };
@@ -82,6 +83,7 @@
   function showView(sectionId) {
     document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === `view-${sectionId}`));
     if (sectionId === 'backtest' && window.BacktestView) window.BacktestView.onShow();
+    if (sectionId === 'optimizer' && window.OptimizerView) window.OptimizerView.onShow();
     if (sectionId === 'strategies' && window.StrategiesView) window.StrategiesView.onShow();
     if (['dashboard', 'paper', 'positions', 'history'].includes(sectionId) && window.PaperView) window.PaperView.onShow();
   }

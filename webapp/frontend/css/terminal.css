@@ -723,3 +723,30 @@ tbody tr:last-child td{border-bottom:none}
   100% { opacity: 1; transform: scale(1.1); }
 }
 
+
+/* ---- Daily optimizer ---- */
+.opt-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.opt-title { margin: 0 0 6px; font-size: 18px; }
+.opt-desc { margin: 0; max-width: 720px; color: #97a1ad; font-size: 13px; line-height: 1.5; }
+.opt-controls { display: flex; align-items: center; gap: 14px; }
+.opt-toggle { font-size: 13px; color: #c5ccd6; display: flex; align-items: center; gap: 6px; }
+.opt-layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; }
+@media (max-width: 800px) { .opt-layout { grid-template-columns: 1fr; } }
+.opt-runs { display: flex; flex-direction: column; gap: 6px; max-height: 70vh; overflow-y: auto; }
+.opt-run { text-align: left; background: #12151b; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 12px; color: #c5ccd6; cursor: pointer; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.opt-run.active { border-color: #d8ac47; }
+.opt-run span { color: #97a1ad; }
+.opt-report-title { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+.opt-card { background: #12151b; border: 1px solid rgba(255,255,255,0.08); border-left: 3px solid #4a5260; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+.opt-card.adjust_rr, .opt-card.adjust_risk { border-left-color: #d8ac47; }
+.opt-card.pause { border-left-color: #e4685f; }
+.opt-card-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.opt-strat { font-weight: 600; font-size: 13px; }
+.opt-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: rgba(255,255,255,0.07); color: #c5ccd6; }
+.opt-badge.adjust_rr, .opt-badge.adjust_risk { background: rgba(216,172,71,0.18); color: #d8ac47; }
+.opt-badge.pause { background: rgba(228,104,95,0.18); color: #e4685f; }
+.opt-row { margin-top: 6px; }
+.opt-row label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: #7c8593; }
+.opt-row p { margin: 2px 0 0; font-size: 13px; line-height: 1.45; color: #d5dae1; }
+.opt-change { margin-top: 8px; padding: 6px 10px; background: rgba(216,172,71,0.1); border-radius: 6px; font-size: 13px; }
+.opt-empty { color: #7c8593; font-size: 13px; }

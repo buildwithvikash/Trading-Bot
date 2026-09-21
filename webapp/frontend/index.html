@@ -507,6 +507,23 @@
     </div>
   </section>
 
+  <section class="view" id="view-optimizer">
+    <div class="opt-head">
+      <div>
+        <h2 class="opt-title">Daily Strategy Optimizer</h2>
+        <p class="opt-desc">Every day after the market break it reviews each running strategy's recent closed trades and, when the evidence is strong enough, makes one small, bounded change (take-profit RR, risk per trade, or pausing a clearly losing strategy). Every finding and change is logged below.</p>
+      </div>
+      <div class="opt-controls">
+        <label class="opt-toggle"><input type="checkbox" id="optEnabled"> Auto-optimize daily</label>
+        <button type="button" class="bt-run-btn" id="optRunBtn">Run review now</button>
+      </div>
+    </div>
+    <div class="opt-layout">
+      <div class="opt-runs" id="optRuns"></div>
+      <div class="opt-report" id="optReport"><p class="opt-empty">Select a report.</p></div>
+    </div>
+  </section>
+
   <section class="view" id="view-ai">
 
     <div class="ai-quant-hero">
@@ -630,7 +647,8 @@
 <script src="/js/settings.js?v=3"></script>
 <script src="/js/paper.js?v=17"></script>
 <script src="/js/ai.js?v=1"></script>
-<script src="/js/app.js?v=22"></script>
+<script src="/js/optimizer.js?v=1"></script>
+<script src="/js/app.js?v=23"></script>
 </body>
 
 </html>

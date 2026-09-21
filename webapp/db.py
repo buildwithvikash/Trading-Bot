@@ -148,6 +148,39 @@ CREATE TABLE IF NOT EXISTS paper_trade_history (
     exit_reason TEXT NOT NULL,
     tag TEXT
 );
+CREATE TABLE IF NOT EXISTS optimizer_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    enabled INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS optimizer_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_at TEXT NOT NULL,
+    trigger TEXT NOT NULL,            -- scheduled | manual
+    strategies_reviewed INTEGER NOT NULL DEFAULT 0,
+    changes_applied INTEGER NOT NULL DEFAULT 0,
+    summary TEXT
+);
+
+CREATE TABLE IF NOT EXISTS optimizer_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    wallet_key TEXT NOT NULL,
+    strategy_id TEXT NOT NULL,
+    trades INTEGER NOT NULL DEFAULT 0,
+    win_rate REAL,
+    profit_factor REAL,
+    expectancy_r REAL,
+    net_pnl REAL,
+    finding TEXT NOT NULL,
+    action TEXT NOT NULL,             -- none | deferred | adjust_rr | adjust_risk | pause
+    param TEXT,
+    old_value TEXT,
+    new_value TEXT,
+    reason TEXT,
+    expected_effect TEXT,
+    applied INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
