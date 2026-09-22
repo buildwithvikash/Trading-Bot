@@ -523,6 +523,11 @@ class AutoTrader:
     def _place(self, conn, order, settings: dict, price: dict | None) -> None:
         if order.kind == "market":
             if price is None:
+                ACTIVITY.add(
+                    "error",
+                    f"{self.strategy_id} (wallet '{self.wallet_key}'): market-order signal dropped — "
+                    f"no live price available (biquote tick fetch failed)",
+                )
                 return
             ref_price = price["ask"] if order.direction == 1 else price["bid"]
         else:
@@ -563,6 +568,16 @@ class AutoTrader:
             max_lot=settings["max_lot"], max_risk_pct=settings["max_risk_per_trade_pct"],
         )
         if lots <= 0:
+            # Silent before this: a signal could round to 0 lots (balance too
+            # small / risk_per_oz too wide / min_lot too high for risk_pct)
+            # and just vanish with no trace — this is what made the whole
+            # min_lot=0.02 misconfiguration invisible for ~19 hours straight.
+            ACTIVITY.add(
+                "error",
+                f"{self.strategy_id} (wallet '{self.wallet_key}'): signal produced a 0-lot order — "
+                f"risk {risk_pct}% of ${balance:.2f} = ${risk_amount:.2f} at stop distance {risk_per_oz:.2f} "
+                f"rounds below min_lot {settings['min_lot']} (raise risk_pct, lower min_lot, or top up the wallet)",
+            )
             return
 
         units = lots * settings["contract_size"]
