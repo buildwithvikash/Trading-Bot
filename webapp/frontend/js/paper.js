@@ -7,7 +7,7 @@ window.PaperView = (function () {
   const fmtSign = (n, d = 2) => (n === null || n === undefined || !isFinite(n)) ? '—' : (n > 0 ? '+' : '') + fmt(n, d);
   // Trade times are stored/served in UTC — shown as IST (primary) with the
   // UTC time underneath in small type, same convention as the optimizer reports.
-  const DT_OPTS = { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false };
+  const DT_OPTS = { year: 'numeric', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false };
   const fmtZone = (iso, timeZone) => new Date(iso).toLocaleString('en-GB', { ...DT_OPTS, timeZone }).replace(',', '');
   const fmtDT = (iso) => `<div>${fmtZone(iso, 'Asia/Kolkata')} IST</div><div class="hist-time-utc">${fmtZone(iso, 'UTC')} UTC</div>`;
   const EXIT_LABEL = { stop: 'Stop loss', tp1: 'Take profit', breakeven: 'Breakeven', trail_stop: 'Trailing stop', time_exit: 'Time exit', stop_ambiguous: 'Stop (ambiguous)', manual_close: 'Manual close' };
