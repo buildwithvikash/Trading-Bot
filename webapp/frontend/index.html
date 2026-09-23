@@ -518,6 +518,12 @@
         <button type="button" class="bt-run-btn" id="optRunBtn">Run review now</button>
       </div>
     </div>
+    <div class="opt-filter">
+      <label>From (IST)<input type="datetime-local" id="optFilterFrom"></label>
+      <label>To (IST)<input type="datetime-local" id="optFilterTo"></label>
+      <button type="button" class="bt-secondary-btn" id="optFilterApply">Filter</button>
+      <button type="button" class="bt-secondary-btn" id="optFilterClear">Clear</button>
+    </div>
     <div class="opt-layout">
       <div class="opt-runs" id="optRuns"></div>
       <div class="opt-report" id="optReport"><p class="opt-empty">Select a report.</p></div>
@@ -647,7 +653,7 @@
 <script src="/js/settings.js?v=3"></script>
 <script src="/js/paper.js?v=17"></script>
 <script src="/js/ai.js?v=1"></script>
-<script src="/js/optimizer.js?v=1"></script>
+<script src="/js/optimizer.js?v=2"></script>
 <script src="/js/app.js?v=23"></script>
 </body>
 

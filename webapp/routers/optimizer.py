@@ -32,11 +32,22 @@ def run_now():
 
 
 @router.get("/reports")
-def reports(limit: int = 30):
+def reports(limit: int = 30, start: str | None = None, end: str | None = None):
+    """start/end are ISO datetimes (any offset, e.g. from an IST <input
+    type=datetime-local> converted client-side) filtering on run_at."""
     conn = db.get_conn()
     try:
+        clauses, params = [], []
+        if start:
+            clauses.append("run_at >= ?")
+            params.append(start)
+        if end:
+            clauses.append("run_at <= ?")
+            params.append(end)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.append(min(limit, 200))
         return [dict(r) for r in conn.execute(
-            "SELECT * FROM optimizer_runs ORDER BY id DESC LIMIT ?", (min(limit, 200),)).fetchall()]
+            f"SELECT * FROM optimizer_runs {where} ORDER BY id DESC LIMIT ?", params).fetchall()]
     finally:
         conn.close()
 
