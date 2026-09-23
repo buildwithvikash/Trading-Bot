@@ -330,6 +330,7 @@ body{
 .trade-row:hover{background:var(--panel-2)}
 .trade-row.selected{background:var(--accent-soft)}
 
+.hist-time-utc{font-size:10.5px; color:var(--text-faint); margin-top:1px}
 .hist-strategy-row{cursor:pointer}
 .hist-strategy-row:hover{background:var(--panel-2)}
 .hist-strategy-row.selected{background:var(--accent-soft)}

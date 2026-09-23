@@ -5,6 +5,11 @@ window.PaperView = (function () {
 
   const fmt = (n, d = 2) => (n === null || n === undefined || !isFinite(n)) ? '—' : Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
   const fmtSign = (n, d = 2) => (n === null || n === undefined || !isFinite(n)) ? '—' : (n > 0 ? '+' : '') + fmt(n, d);
+  // Trade times are stored/served in UTC — shown as IST (primary) with the
+  // UTC time underneath in small type, same convention as the optimizer reports.
+  const DT_OPTS = { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false };
+  const fmtZone = (iso, timeZone) => new Date(iso).toLocaleString('en-GB', { ...DT_OPTS, timeZone }).replace(',', '');
+  const fmtDT = (iso) => `<div>${fmtZone(iso, 'Asia/Kolkata')} IST</div><div class="hist-time-utc">${fmtZone(iso, 'UTC')} UTC</div>`;
   const EXIT_LABEL = { stop: 'Stop loss', tp1: 'Take profit', breakeven: 'Breakeven', trail_stop: 'Trailing stop', time_exit: 'Time exit', stop_ambiguous: 'Stop (ambiguous)', manual_close: 'Manual close' };
   const SESSION_LABEL = { london: 'London', ny: 'New York', overlap: 'Overlap', asian: 'Asian' };
 
@@ -116,7 +121,7 @@ window.PaperView = (function () {
       <th class="num">SL</th><th class="num">TP</th><th class="num">R</th><th class="num">Floating P&amp;L</th>${withClose ? '<th></th>' : ''}
     </tr></thead>`;
     const body = positions.map(p => `<tr>
-      <td>${p.entry_time.slice(0, 16).replace('T', ' ')}</td>
+      <td>${fmtDT(p.entry_time)}</td>
       <td><span class="pill-tag ${p.direction === 1 ? 'long' : 'short'}">${p.direction === 1 ? 'LONG' : 'SHORT'}</span></td>
       <td>${sourceTag(p.tag)}</td>
       <td class="num">${fmt(p.lots, 2)}</td>
@@ -167,7 +172,7 @@ window.PaperView = (function () {
       <th class="num">R</th><th class="num">Net P&amp;L</th><th>Reason</th>
     </tr></thead>`;
     const body = rows.map(t => `<tr>
-      <td>${t.exit_time.slice(0, 16).replace('T', ' ')}</td>
+      <td>${fmtDT(t.exit_time)}</td>
       <td><span class="pill-tag ${t.direction === 1 ? 'long' : 'short'}">${t.direction === 1 ? 'LONG' : 'SHORT'}</span></td>
       <td>${sourceTag(t.tag)}</td>
       <td>${SESSION_LABEL[t.session] || t.session}</td>
