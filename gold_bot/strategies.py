@@ -1765,6 +1765,242 @@ class OrderBlockSweep(Strategy):
         return []
 
 
+# --------------------------------------------------------------------- #
+def _session_hilo(df: pd.DataFrame, day: pd.Series, start_min: int, end_min: int):
+    """This calendar day's high/low over [start_min, end_min) minutes-of-day,
+    broadcast onto every bar of that same day (like LiquiditySweepReversal's
+    asian_high/low) — safe to read from any LATER session the same day
+    without lookahead, since the window that produced it has already closed
+    by the time a later session starts checking it."""
+    mins = df.index.hour * 60 + df.index.minute
+    in_win = (mins >= start_min) & (mins < end_min)
+    agg = df[in_win].groupby(day[in_win]).agg({"high": "max", "low": "min"})
+    return pd.Series(day, index=df.index).map(agg["high"]), pd.Series(day, index=df.index).map(agg["low"])
+
+
+@dataclass
+class GoldConfluenceSweep(Strategy):
+    """"Gold Confluence Sweep" — user-supplied spec (v1.0, 2026-09-23)
+    combining four of this file's other strategies into layered filters:
+      1. 4H EMA(fast)/EMA(slow) trend bias (same rule as htf_ema_bias) —
+         only long in an uptrend, only short in a downtrend.
+      2-3. A session-specific liquidity level is swept AGAINST the bias
+         (a low sweep in an uptrend, a high sweep in a downtrend) and
+         reclaimed within `sweep_reclaim_bars` candles — Asian session
+         watches the prior day's high/low, London watches the Asian
+         range, New York watches the London range or its own 13:30-13:45
+         opening range once that's closed.
+      4. A market-structure shift (close beyond the prior swing), then a
+         same-direction FVG from the displacement candle. The entry is
+         the FVG midpoint, taken only if it falls in the 50-78.6%
+         retracement zone (0% at the MSS close, 100% at the sweep
+         extreme — this file's existing sweep strategies don't need this
+         extra fib check since they already gate on RR against a target;
+         this one uses it purely as the spec's "entry quality filter").
+
+    Stop = whichever is WIDER of (beyond the sweep wick) or (sl_atr_mult
+    x ATR); rejected outright if that distance exceeds max_sl_atr_mult x
+    ATR or max_sl_usd (the spec's "too wide for this account" skip).
+    tp1/tp2 are 1.5R/3R with a 2xATR trail — the Backtester's tp1/tp2
+    partial-close-then-breakeven-then-trail applies exactly as specified;
+    live/demo auto-trade collapses to a single take-profit (tp1) same as
+    every other strategy here that sets both (see webapp.autotrade's
+    "take_profit = order.tp1 if ... else order.tp2"), so it exits fully
+    at 1.5R rather than scaling out live.
+
+    NOT implemented (spec sections not expressible as a bar-by-bar entry
+    signal, or needing data this app doesn't have): the high-impact-news
+    blackout, a live spread filter, US DST auto-shifting the NY session
+    window, and the account-level daily/weekly loss caps and per-trade
+    dollar risk (this app's risk circuit breakers and position sizing are
+    shared settings across every strategy/wallet, not per-strategy — set
+    those in Settings/Risk if you want this wallet to match section 8
+    exactly).
+    """
+
+    name: str = "gold_confluence_sweep"
+    timeframe: str = "15min"
+    htf_timeframe: str = "4h"
+    ema_fast: int = 50
+    ema_slow: int = 200
+    asian_start: str = "00:00"
+    asian_end: str = "06:00"
+    london_start: str = "07:00"
+    london_end: str = "11:00"
+    ny_start: str = "13:30"
+    ny_end: str = "17:00"
+    ny_or_minutes: int = 15
+    sweep_reclaim_bars: int = 3
+    swing_lookback: int = 10
+    mss_within_bars: int = 15
+    fvg_within_bars: int = 10
+    displacement_atr_mult: float = 0.8
+    displacement_body_ratio: float = 0.6
+    fvg_min_atr_mult: float = 0.05
+    fib_lo: float = 0.50
+    fib_hi: float = 0.786
+    entry_expiry_bars: int = 4
+    atr_period: int = 14
+    sl_atr_mult: float = 1.5
+    max_sl_atr_mult: float = 2.5
+    max_sl_usd: float = 20.0
+    tp1_rr: float = 1.5
+    tp2_rr: float = 3.0
+    trail_atr_mult: float | None = 2.0
+    time_exit_utc: str = "20:00"
+
+    def prepare(self, df: pd.DataFrame) -> pd.DataFrame:
+        df["atr"] = atr(df, self.atr_period)
+        df["bias"] = htf_ema_bias(df, self.htf_timeframe, self.ema_fast, self.ema_slow)
+
+        daily = df.resample("1D").agg({"high": "max", "low": "min"}).dropna()
+        prev = daily.shift(1)
+        prev.index = prev.index.normalize()
+        day = df.index.normalize()
+        df["pdh"] = pd.Series(day, index=df.index).map(prev["high"])
+        df["pdl"] = pd.Series(day, index=df.index).map(prev["low"])
+
+        df["asian_high"], df["asian_low"] = _session_hilo(df, day, _hm(self.asian_start), _hm(self.asian_end))
+        df["london_high"], df["london_low"] = _session_hilo(df, day, _hm(self.london_start), _hm(self.london_end))
+        ny_start_m = _hm(self.ny_start)
+        df["ny_or_high"], df["ny_or_low"] = _session_hilo(df, day, ny_start_m, ny_start_m + self.ny_or_minutes)
+
+        df["swing_high"] = prior_swing_high(df, self.swing_lookback)
+        df["swing_low"] = prior_swing_low(df, self.swing_lookback)
+
+        fvg = fair_value_gaps(df)
+        for col in fvg.columns:
+            df[col] = fvg[col]
+        disp = displacement(df, df["atr"], self.displacement_atr_mult, self.displacement_body_ratio)
+        for col in disp.columns:
+            df[col] = disp[col]
+
+        bar_len = int((df.index[1] - df.index[0]).total_seconds() // 60)
+        self._bar_len = max(bar_len, 1)
+        return df
+
+    def _session_level(self, row, m: int):
+        """(high-side level, low-side level) for whichever session `m`
+        (minutes since midnight UTC) falls in, or (None, None) outside all
+        three — matching this file's `_minutes`/`_hm` convention."""
+        if _hm(self.asian_start) <= m < _hm(self.asian_end):
+            return row["pdh"], row["pdl"]
+        if _hm(self.london_start) <= m < _hm(self.london_end):
+            return row["asian_high"], row["asian_low"]
+        ny_start_m, ny_end_m = _hm(self.ny_start), _hm(self.ny_end)
+        if ny_start_m <= m < ny_end_m:
+            or_end_m = ny_start_m + self.ny_or_minutes
+            if m >= or_end_m and np.isfinite(row["ny_or_high"]):
+                return row["ny_or_high"], row["ny_or_low"]
+            return row["london_high"], row["london_low"]
+        return None, None
+
+    def generate(self, df, i, state):
+        ts = df.index[i]
+        m = _minutes(ts)
+        row = df.iloc[i]
+        a = row["atr"]
+        if not np.isfinite(a) or a <= 0:
+            return []
+        bias = row["bias"]
+        level_hi, level_lo = self._session_level(row, m)
+
+        seq = state.get("seq")
+        if seq is not None and i - seq["anchor_bar"] > self.sweep_reclaim_bars + self.mss_within_bars + self.fvg_within_bars:
+            seq = None
+        state["seq"] = seq
+
+        if seq is None:
+            if bias == 1 and level_lo is not None and np.isfinite(level_lo) and row["low"] < level_lo:
+                seq = {"side": 1, "level": level_lo, "extreme": row["low"], "anchor_bar": i, "stage": "sweeping"}
+            elif bias == -1 and level_hi is not None and np.isfinite(level_hi) and row["high"] > level_hi:
+                seq = {"side": -1, "level": level_hi, "extreme": row["high"], "anchor_bar": i, "stage": "sweeping"}
+            else:
+                return []
+            state["seq"] = seq
+
+        if seq["stage"] == "sweeping":
+            # >3 candles closed beyond the level without reclaiming = a
+            # breakout, not a sweep — invalidate rather than keep waiting.
+            if i - seq["anchor_bar"] > self.sweep_reclaim_bars:
+                state["seq"] = None
+                return []
+            if seq["side"] == 1:
+                seq["extreme"] = min(seq["extreme"], row["low"])
+                reclaimed = row["close"] > seq["level"]
+            else:
+                seq["extreme"] = max(seq["extreme"], row["high"])
+                reclaimed = row["close"] < seq["level"]
+            if not reclaimed:
+                return []
+            seq["stage"], seq["reclaim_bar"] = "mss_wait", i
+            # fall through — the reclaim candle can be the MSS candle too
+
+        if seq["stage"] == "mss_wait":
+            if i - seq["reclaim_bar"] > self.mss_within_bars:
+                state["seq"] = None
+                return []
+            mss = (
+                (seq["side"] == 1 and np.isfinite(row["swing_high"]) and row["close"] > row["swing_high"])
+                or (seq["side"] == -1 and np.isfinite(row["swing_low"]) and row["close"] < row["swing_low"])
+            )
+            if not mss:
+                return []
+            seq["stage"], seq["mss_bar"], seq["mss_price"] = "fvg_wait", i, row["close"]
+            # fall through — the displacement candle that caused the MSS can carry its own FVG too
+
+        # stage == "fvg_wait"
+        if i - seq["mss_bar"] > self.fvg_within_bars:
+            state["seq"] = None
+            return []
+
+        top = bottom = None
+        if seq["side"] == 1 and row["disp_bull"] and row["bull_fvg"] and row["bull_fvg_size"] >= self.fvg_min_atr_mult * a:
+            top, bottom = row["bull_fvg_top"], row["bull_fvg_bottom"]
+        elif seq["side"] == -1 and row["disp_bear"] and row["bear_fvg"] and row["bear_fvg_size"] >= self.fvg_min_atr_mult * a:
+            top, bottom = row["bear_fvg_top"], row["bear_fvg_bottom"]
+        if top is None:
+            return []
+
+        direction = seq["side"]
+        extreme = seq["extreme"]
+        mss_price = seq["mss_price"]
+        entry_level = (top + bottom) / 2.0
+        state["seq"] = None  # the sequence is consumed here whether or not a valid order results
+
+        span = mss_price - extreme
+        if span == 0:
+            return []
+        zone_a = mss_price - self.fib_lo * span
+        zone_b = mss_price - self.fib_hi * span
+        zone_lo, zone_hi = min(zone_a, zone_b), max(zone_a, zone_b)
+        if not (zone_lo <= entry_level <= zone_hi):
+            return []  # entry quality filter: outside the 50-78.6% retracement zone
+
+        dist_wick = abs(entry_level - extreme)
+        dist_atr = self.sl_atr_mult * a
+        stop_distance = max(dist_wick, dist_atr)
+        if stop_distance <= 0 or stop_distance > self.max_sl_atr_mult * a or stop_distance > self.max_sl_usd:
+            return []
+
+        stop = entry_level - direction * stop_distance
+        tp1 = entry_level + direction * self.tp1_rr * stop_distance
+        tp2 = entry_level + direction * self.tp2_rr * stop_distance
+        expiry = ts + pd.Timedelta(minutes=self.entry_expiry_bars * self._bar_len)
+        day = ts.normalize()
+        time_exit = day + pd.Timedelta(minutes=_hm(self.time_exit_utc))
+        if time_exit <= ts:
+            time_exit += pd.Timedelta(days=1)
+
+        return [
+            Order(
+                created_at=ts, direction=direction, kind="limit", trigger=entry_level,
+                stop_loss=stop, tp1=tp1, tp2=tp2, expiry=expiry, time_exit=time_exit,
+                trail_atr_mult=self.trail_atr_mult, tag=self.name,
+            )
+        ]
+
+
 STRATEGY_REGISTRY = {
     "asian_sweep": AsianSweepReversal,
     "ny_orb": NYOpeningRange,
@@ -1775,6 +2011,7 @@ STRATEGY_REGISTRY = {
     "sweep_mss_fvg_4h": LiquiditySweepMSSFVGRetest,
     "second_fvg_retest": SecondFVGRetest,
     "order_block_sweep": OrderBlockSweep,
+    "gold_confluence_sweep": GoldConfluenceSweep,
     "custom_rule": RuleStrategy,
 }
 
