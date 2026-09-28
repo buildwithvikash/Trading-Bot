@@ -32,9 +32,12 @@ def run_now():
 
 
 @router.get("/reports")
-def reports(limit: int = 30, start: str | None = None, end: str | None = None):
+def reports(limit: int = 30, start: str | None = None, end: str | None = None,
+            trigger: str | None = None, changed_only: bool = False):
     """start/end are ISO datetimes (any offset, e.g. from an IST <input
-    type=datetime-local> converted client-side) filtering on run_at."""
+    type=datetime-local> converted client-side) filtering on run_at.
+    trigger narrows to 'scheduled' or 'manual'; changed_only keeps only runs
+    that applied at least one change."""
     conn = db.get_conn()
     try:
         clauses, params = [], []
@@ -44,6 +47,11 @@ def reports(limit: int = 30, start: str | None = None, end: str | None = None):
         if end:
             clauses.append("run_at <= ?")
             params.append(end)
+        if trigger:
+            clauses.append("trigger = ?")
+            params.append(trigger)
+        if changed_only:
+            clauses.append("changes_applied > 0")
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         params.append(min(limit, 200))
         return [dict(r) for r in conn.execute(

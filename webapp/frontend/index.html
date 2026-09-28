@@ -482,14 +482,27 @@
   </section>
 
   <section class="view" id="view-history">
-    <div class="bt-panel">
-      <div class="bt-panel-title">Strategy performance <span class="bt-panel-note">click a row to filter the trade log below</span></div>
-      <div class="table-scroll"><table id="histStrategyTable"></table></div>
-    </div>
-    <div class="bt-panel hist-panel">
-      <div class="bt-panel-title">Trade history <span class="bt-panel-note" id="histCount"></span></div>
-      <div class="hist-filters">
+    <div class="hist-filterbar">
+      <div class="hf-group">
+        <span class="hf-label">Period</span>
+        <div class="seg" id="histPeriod" role="group" aria-label="Period">
+          <button type="button" data-v="today">Today</button>
+          <button type="button" data-v="7">7D</button>
+          <button type="button" data-v="30">30D</button>
+          <button type="button" data-v="all">All</button>
+          <button type="button" data-v="custom">Custom</button>
+        </div>
+      </div>
+      <div class="hf-group hf-custom" id="histCustom" hidden>
+        <label><span class="hf-label">From (IST)</span><input type="date" id="histFrom"></label>
+        <label><span class="hf-label">To (IST)</span><input type="date" id="histTo"></label>
+      </div>
+      <div class="hf-group">
+        <span class="hf-label">Strategy</span>
         <select class="bt-select" id="histFilterStrategy"><option value="all">All strategies</option></select>
+      </div>
+      <div class="hf-group">
+        <span class="hf-label">Session</span>
         <select class="bt-select" id="histFilterSession">
           <option value="all">All sessions</option>
           <option value="asian">Asian</option>
@@ -497,13 +510,47 @@
           <option value="overlap">Overlap</option>
           <option value="ny">New York</option>
         </select>
-        <select class="bt-select" id="histFilterSide">
-          <option value="all">All sides</option>
-          <option value="1">Long</option>
-          <option value="-1">Short</option>
-        </select>
       </div>
-      <div class="table-scroll bt-trade-scroll hist-fill"><table id="histTable"></table></div>
+      <div class="hf-group">
+        <span class="hf-label">Side</span>
+        <div class="seg" id="histSide" role="group" aria-label="Side">
+          <button type="button" data-v="all">All</button>
+          <button type="button" data-v="1">Long</button>
+          <button type="button" data-v="-1">Short</button>
+        </div>
+      </div>
+      <div class="hf-group">
+        <span class="hf-label">Outcome</span>
+        <div class="seg" id="histOutcome" role="group" aria-label="Outcome">
+          <button type="button" data-v="all">All</button>
+          <button type="button" data-v="win">Wins</button>
+          <button type="button" data-v="loss">Losses</button>
+        </div>
+      </div>
+      <div class="hf-group">
+        <span class="hf-label">Exit reason</span>
+        <select class="bt-select" id="histFilterReason"><option value="all">All reasons</option></select>
+      </div>
+      <div class="hf-meta">
+        <span id="histCount"></span>
+        <button type="button" class="bt-secondary-btn" id="histReset">Reset</button>
+      </div>
+    </div>
+
+    <div class="stat-tiles" id="histKpis"></div>
+
+    <div class="bt-panel">
+      <div class="bt-panel-title">Equity curve <span class="bt-panel-note">cumulative net P&amp;L of the filtered trades</span></div>
+      <div class="hist-equity" id="histEquity"></div>
+    </div>
+
+    <div class="bt-panel">
+      <div class="bt-panel-title">Strategy performance <span class="bt-panel-note">click a row to filter by strategy &middot; click a header to sort</span></div>
+      <div class="table-scroll"><table id="histStrategyTable" class="sortable"></table></div>
+    </div>
+    <div class="bt-panel hist-panel">
+      <div class="bt-panel-title">Trade history <span class="bt-panel-note" id="histTradeNote">click a header to sort</span></div>
+      <div class="table-scroll bt-trade-scroll hist-fill"><table id="histTable" class="sortable"></table></div>
     </div>
   </section>
 
@@ -518,14 +565,37 @@
         <button type="button" class="bt-run-btn" id="optRunBtn">Run review now</button>
       </div>
     </div>
-    <div class="opt-filter">
-      <label>From (IST)<input type="datetime-local" id="optFilterFrom"></label>
-      <label>To (IST)<input type="datetime-local" id="optFilterTo"></label>
-      <button type="button" class="bt-secondary-btn" id="optFilterApply">Filter</button>
-      <button type="button" class="bt-secondary-btn" id="optFilterClear">Clear</button>
+    <div class="opt-filterbar">
+      <div class="opt-filter-group">
+        <span class="opt-filter-label">Period</span>
+        <div class="seg" id="optRange" role="group" aria-label="Period">
+          <button type="button" data-range="1">24h</button>
+          <button type="button" data-range="7">7D</button>
+          <button type="button" data-range="30">30D</button>
+          <button type="button" data-range="all" class="active">All</button>
+          <button type="button" data-range="custom">Custom</button>
+        </div>
+      </div>
+      <div class="opt-filter-group opt-custom" id="optCustom" hidden>
+        <label><span class="opt-filter-label">From (IST)</span><input type="datetime-local" id="optFilterFrom"></label>
+        <label><span class="opt-filter-label">To (IST)</span><input type="datetime-local" id="optFilterTo"></label>
+      </div>
+      <div class="opt-filter-group">
+        <span class="opt-filter-label">Trigger</span>
+        <select class="bt-select" id="optFilterTrigger">
+          <option value="">All</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="manual">Manual</option>
+        </select>
+      </div>
+      <label class="opt-switch"><input type="checkbox" id="optFilterChanged"> Only runs with changes</label>
+      <div class="opt-filter-meta">
+        <span id="optRunCount"></span>
+        <button type="button" class="bt-secondary-btn" id="optFilterClear">Reset</button>
+      </div>
     </div>
     <div class="opt-layout">
-      <div class="opt-runs" id="optRuns"></div>
+      <aside class="opt-runs" id="optRuns"></aside>
       <div class="opt-report" id="optReport"><p class="opt-empty">Select a report.</p></div>
     </div>
   </section>
