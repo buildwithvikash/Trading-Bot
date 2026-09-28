@@ -225,7 +225,6 @@ window.PaperView = (function () {
       statTile(acct.open_positions, 'Open Positions'),
     ].join('');
 
-    document.getElementById('dashPosCount').textContent = `${acct.open_positions} open`;
   }
 
   // ==================== STRATEGY WALLETS ====================
@@ -573,6 +572,8 @@ window.PaperView = (function () {
       await renderDashboard();
       refreshWallets();
       renderPositionsTable(document.getElementById('dashPosTable'), positions.slice(0, 6), { withClose: false });
+      // every wallet's positions, matching the table — acct.open_positions is the manual wallet only
+      document.getElementById('dashPosCount').textContent = `${positions.length} open`;
       renderHistoryTable(document.getElementById('dashHistTable'), history.slice(0, 6));
     }
     if (paperVisible) {

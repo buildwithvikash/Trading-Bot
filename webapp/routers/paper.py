@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import math
+import time
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -94,6 +95,32 @@ def _ensure_all_known_wallets(conn) -> None:
 def _get_wallet(conn, key: str) -> dict:
     _ensure_wallet(conn, key)
     return dict(conn.execute("SELECT * FROM paper_wallets WHERE wallet_key = ?", (key,)).fetchone())
+
+
+_DISPLAY_TICK: dict = {"at": 0.0, "price": None}
+
+
+def _mark_price(tag: str | None) -> dict | None:
+    """Price to value one wallet's open positions at. The shared FEED when
+    it's running; otherwise the owning strategy runner's own source (the one
+    it already trades and manages SL/TP from) — the FEED isn't auto-started
+    after a restart but saved strategies are, which left open positions
+    showing no current price / R / floating P&L. Biquote ticks are cached
+    ~2s here, for display only, so a 2s dashboard poll doesn't add a network
+    call per position."""
+    price = FEED.current_price()
+    if price is not None:
+        return price
+    runner = AUTOTRADERS.get(tag or "manual")
+    if runner is None:
+        return None
+    if runner.mode != "biquote":
+        return runner._current_price()
+    now = time.monotonic()
+    if now - _DISPLAY_TICK["at"] > 2.0:
+        _DISPLAY_TICK["price"] = runner._current_price()
+        _DISPLAY_TICK["at"] = now
+    return _DISPLAY_TICK["price"]
 
 
 def _wallet_stats(conn, key: str, wallet: dict, price: dict | None) -> dict:
@@ -553,7 +580,7 @@ def get_account(wallet: str = "manual"):
     try:
         w = _get_wallet(conn, wallet)
         conn.commit()
-        stats = _wallet_stats(conn, wallet, w, FEED.current_price())
+        stats = _wallet_stats(conn, wallet, w, _mark_price(wallet))
         return {**stats, "feed_running": FEED.is_running()}
     finally:
         conn.close()
@@ -568,9 +595,8 @@ def list_wallets():
     try:
         _ensure_all_known_wallets(conn)
         conn.commit()
-        price = FEED.current_price()
         rows = conn.execute("SELECT * FROM paper_wallets ORDER BY wallet_key").fetchall()
-        return [_wallet_stats(conn, r["wallet_key"], dict(r), price) for r in rows]
+        return [_wallet_stats(conn, r["wallet_key"], dict(r), _mark_price(r["wallet_key"])) for r in rows]
     finally:
         conn.close()
 
@@ -610,8 +636,8 @@ def get_positions():
         rows = [dict(r) for r in conn.execute(
             "SELECT * FROM paper_positions ORDER BY entry_time DESC"
         ).fetchall()]
-        price = FEED.current_price()
         for r in rows:
+            price = _mark_price(r["tag"])
             if price is not None:
                 fp = paper_engine.floating_pnl(CostConfig(), r, price["mid"])
                 r["floating_pnl"] = round(fp, 2)
