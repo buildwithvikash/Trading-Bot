@@ -364,6 +364,7 @@ window.PaperView = (function () {
     const running = autoStatusList.filter(s => s.enabled);
 
     countEl.textContent = running.length ? `${running.length} active` : '';
+    refreshFundWallet(running);
     if (!running.length) {
       listEl.className = 'bt-panel-note';
       listEl.textContent = 'Nothing running yet.';
@@ -384,7 +385,7 @@ window.PaperView = (function () {
         <div class="auto-running-row">
           <div class="auto-running-info">
             <b>${cfg ? cfg.name : s.strategy}</b>
-            <div class="bt-panel-note">wallet '${s.wallet}' · ${s.timeframe} · ${modeTxt} · ${riskTxt}</div>
+            <div class="bt-panel-note">${s.fund_wallet ? `trades from shared wallet '${s.fund_wallet}'` : `wallet '${s.wallet}'`} · ${s.timeframe} · ${modeTxt} · ${riskTxt}</div>
             ${blockTxt}
           </div>
           <button type="button" class="dash-mini-action" data-details="${s.wallet}">${isOpen ? 'Hide setup' : 'Setup'}</button>
@@ -407,6 +408,21 @@ window.PaperView = (function () {
     // rebuild — without this, the very next 2s poll would silently wipe
     // whatever the click handler just showed.
     openSetupWallets.forEach(wallet => loadSetupDetail(wallet));
+  }
+
+  // every auto-trading strategy shares one wallet (webapp.portfolio) — show
+  // its money once above the list instead of implying each row has its own
+  async function refreshFundWallet(running) {
+    const el = document.getElementById('autoFundWallet');
+    const fund = (running.find(s => s.fund_wallet) || {}).fund_wallet || 'portfolio';
+    try {
+      const w = await (await fetch(`/api/paper/account?wallet=${encodeURIComponent(fund)}`)).json();
+      const money = v => `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      el.textContent = `Shared wallet '${fund}': balance ${money(w.balance)} · equity ${money(w.equity)} · `
+        + `${w.open_positions} open · ${w.trades} closed trades · started at ${money(w.starting_balance)}`;
+    } catch (err) {
+      el.textContent = '';
+    }
   }
 
   // one strategy's own state-machine snapshot — what stage it's in, how
