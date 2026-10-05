@@ -304,7 +304,12 @@ class RuleStrategy:
         ts = df.index[i]
         if session:
             m = ts.hour * 60 + ts.minute
-            if not (_hm(session["start"]) <= m <= _hm(session["end"])):
+            start, end = _hm(session["start"]), _hm(session["end"])
+            # start > end is a window that wraps past midnight UTC (e.g.
+            # 23:45-07:30), which is also how "every session except London"
+            # is expressed (11:45-06:30)
+            inside = (start <= m <= end) if start <= end else (m >= start or m <= end)
+            if not inside:
                 return []
 
         row = df.iloc[i]

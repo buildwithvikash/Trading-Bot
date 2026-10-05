@@ -211,6 +211,10 @@ def init_db() -> None:
             _add_column_if_missing(conn, "paper_positions", coldef)
         for coldef in ("default_sl_atr_mult REAL NOT NULL DEFAULT 1.5", "default_tp_rr REAL NOT NULL DEFAULT 2.0"):
             _add_column_if_missing(conn, "risk_settings", coldef)
+        # whose money a row is, once strategies share one wallet (see
+        # webapp.portfolio); NULL on older rows = the old per-tag wallet
+        for table in ("paper_orders", "paper_positions", "paper_trade_history"):
+            _add_column_if_missing(conn, table, "wallet_key TEXT")
         conn.execute(
             "INSERT OR IGNORE INTO risk_settings (id, updated_at) VALUES (1, datetime('now'))"
         )
@@ -224,6 +228,10 @@ def init_db() -> None:
         # keeps per-wallet numbers correct. Copying the old shared balance
         # into 'manual' directly double-counts every other wallet's P&L
         # once it's ALSO reconstructed from the same underlying trades.
+        from webapp import portfolio  # deferred: portfolio imports gold_bot, db is imported everywhere
+
+        for note in portfolio.migrate(conn):
+            print(f"[{portfolio.MIGRATION_NAME}] {note}", flush=True)
         conn.commit()
     finally:
         conn.close()

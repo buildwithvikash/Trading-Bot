@@ -11,9 +11,11 @@ already been processed for this same strategy's own wallet — so a signal
 created at the close of bar i can only fill from bar i+1 onward, the same
 no-lookahead rule gold_bot.engine.Backtester enforces.
 
-Multiple strategies can run CONCURRENTLY, each fully independent:
-  - its own wallet (fills/exits/trailing-stops scoped to its own tag, never
-    touching another strategy's positions or the manual "wallet"),
+Multiple strategies can run CONCURRENTLY, each independent except for money:
+  - every strategy trades the one shared wallet (webapp.portfolio), which
+    also enforces the portfolio-wide limits; fills/exits/trailing-stops are
+    still scoped to the strategy's own tag, never touching another
+    strategy's positions or the manual wallet,
   - its own working timeframe (Strategy.timeframe / RuleStrategy.timeframe)
     — not tied to webapp.feed.FEED's single shared timeframe at all,
   - its own background thread polling biquote.io directly
@@ -41,7 +43,7 @@ from gold_bot.config import CostConfig, EngineConfig
 from gold_bot.data import resample
 from gold_bot.risk import position_size
 from gold_bot.strategies import STRATEGY_REGISTRY
-from webapp import biquote_client
+from webapp import biquote_client, portfolio
 from webapp.routers.market import TF_MAP, _raw
 
 
@@ -104,6 +106,9 @@ class AutoTrader:
             if strategy_id == "custom_rule" else getattr(self.strategy, "name", strategy_id)
         )
         self.timeframe = getattr(self.strategy, "timeframe", None) or "15min"
+        # wallet_key above names this runner (and tags its orders); the
+        # money comes from the one wallet every strategy shares
+        self.fund_key = portfolio.SHARED_WALLET
 
         self.mode: str | None = None   # "biquote" | "simulated" — decided in start()
         self.raw_df = None             # unprepared OHLCV
@@ -162,6 +167,7 @@ class AutoTrader:
             "enabled": self.enabled,
             "strategy": self.strategy_id,
             "wallet": self.wallet_key,
+            "fund_wallet": self.fund_key,
             "timeframe": self.timeframe,
             "params": self.params,
             "risk_pct": self.risk_pct,
@@ -473,15 +479,18 @@ class AutoTrader:
 
     def _maybe_generate(self, conn, i: int, ts, get_wallet, risk_block_reason) -> None:
         settings = dict(conn.execute("SELECT * FROM risk_settings WHERE id = 1").fetchone())
-        wallet = get_wallet(conn, self.wallet_key)
+        wallet = get_wallet(conn, self.fund_key)
 
         open_count = conn.execute(
-            "SELECT COUNT(*) c FROM paper_positions WHERE COALESCE(tag,'manual') = ?", (self.wallet_key,)
+            f"SELECT COUNT(*) c FROM paper_positions WHERE {portfolio.WALLET_SQL} = ?", (self.fund_key,)
         ).fetchone()["c"]
         if open_count >= settings["max_open_positions"]:
             block_reason = f"already at the max open positions limit ({settings['max_open_positions']})"
         else:
-            block_reason = risk_block_reason(conn, settings, wallet, self.wallet_key)
+            block_reason = (
+                risk_block_reason(conn, settings, wallet, self.fund_key)
+                or portfolio.entry_block_reason(conn, self.fund_key, ts)
+            )
 
         if block_reason and block_reason != self._last_logged_block:
             ACTIVITY.add("blocked", f"[{self.wallet_key}] New entries blocked: {block_reason}")
@@ -494,7 +503,10 @@ class AutoTrader:
         if not orders:
             return
         price = self._current_price()
-        for order in orders:
+        # checked before placing any, so an OCO pair (e.g. ny_orb's
+        # buy-stop + sell-stop) isn't blocked by its own other half
+        conflicts = [portfolio.order_conflict(conn, self.fund_key, o.direction, ts) for o in orders]
+        for order, conflict in zip(orders, conflicts):
             side = "LONG" if order.direction == 1 else "SHORT"
             tp = order.tp1 if order.tp1 is not None else order.tp2
             tp_txt = f", TP {tp:.2f}" if tp is not None else ""
@@ -503,6 +515,9 @@ class AutoTrader:
                 f"[{self.wallet_key}] {side} signal @ {ts.strftime('%Y-%m-%d %H:%M')} UTC — "
                 f"close {self.df['close'].iloc[i]:.2f}, SL {order.stop_loss:.2f}{tp_txt}",
             )
+            if conflict:
+                ACTIVITY.add("blocked", f"[{self.wallet_key}] {side} signal skipped: {conflict}")
+                continue
             self._place(conn, order, settings, price)
 
     def _current_price(self) -> dict | None:
@@ -560,7 +575,7 @@ class AutoTrader:
 
         from webapp.routers.paper import _get_wallet  # deferred — see _process_bar
 
-        balance = _get_wallet(conn, self.wallet_key)["balance"]
+        balance = _get_wallet(conn, self.fund_key)["balance"]
         risk_pct = self.risk_pct if self.risk_pct is not None else settings["risk_per_trade_pct"]
         lots, risk_amount = position_size(
             balance, risk_pct, risk_per_oz,
@@ -585,14 +600,14 @@ class AutoTrader:
         conn.execute(
             """INSERT INTO paper_orders
                (kind, direction, trigger_price, stop_loss, take_profit, lots, units, risk_amount,
-                tag, oco_group, expiry, time_exit, trail_atr_mult, status, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?)""",
+                tag, oco_group, expiry, time_exit, trail_atr_mult, wallet_key, status, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?)""",
             (
                 order.kind, order.direction, order.trigger, order.stop_loss, take_profit,
                 lots, units, risk_amount, order.tag, order.oco_group,
                 order.expiry.isoformat() if order.expiry is not None else None,
                 order.time_exit.isoformat() if order.time_exit is not None else None,
-                order.trail_atr_mult, now,
+                order.trail_atr_mult, self.fund_key, now,
             ),
         )
 

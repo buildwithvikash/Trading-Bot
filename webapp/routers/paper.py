@@ -27,6 +27,7 @@ from gold_bot.indicators import atr
 from gold_bot.risk import position_size
 from gold_bot.sessions import session_of
 from webapp import biquote_client, db
+from webapp.portfolio import SHARED_WALLET, WALLET_SQL
 from webapp.autotrade import ACTIVITY, AUTOTRADERS
 from webapp.feed import FEED
 from webapp.routers.market import TF_MAP, _raw
@@ -44,10 +45,10 @@ def _json_safe(d: dict) -> dict:
 
 
 # ------------------------------------------------------------------ #
-# per-strategy wallets — one virtual balance per tag ('manual' for
-# untagged/manually-placed orders), so each strategy's P&L, position
-# sizing and daily-loss/drawdown limits are tracked independently instead
-# of all sharing one pool.
+# wallets — auto-trading strategies all share webapp.portfolio's
+# SHARED_WALLET (rows carry wallet_key); manual orders keep 'manual'. Rows
+# from before the shared wallet have no wallet_key and still count toward
+# their old one-wallet-per-tag balance, kept as an archive.
 # ------------------------------------------------------------------ #
 def _wallet_key(tag: str | None) -> str:
     return tag if tag else "manual"
@@ -62,7 +63,7 @@ def _ensure_wallet(conn, key: str, default_balance: float = 10_000.0) -> None:
     if conn.execute("SELECT 1 FROM paper_wallets WHERE wallet_key = ?", (key,)).fetchone():
         return
     trades = conn.execute(
-        "SELECT net_pnl FROM paper_trade_history WHERE COALESCE(tag,'manual') = ? ORDER BY exit_time ASC", (key,)
+        f"SELECT net_pnl FROM paper_trade_history WHERE {WALLET_SQL} = ? ORDER BY exit_time ASC", (key,)
     ).fetchall()
     balance = default_balance
     peak = default_balance
@@ -84,9 +85,9 @@ def _ensure_all_known_wallets(conn) -> None:
     wallets feature shipped."""
     keys = {"manual"}
     for table in ("paper_trade_history", "paper_positions"):
-        keys |= {r[0] for r in conn.execute(f"SELECT DISTINCT COALESCE(tag,'manual') FROM {table}").fetchall()}
+        keys |= {r[0] for r in conn.execute(f"SELECT DISTINCT {WALLET_SQL} FROM {table}").fetchall()}
     keys |= {r[0] for r in conn.execute(
-        "SELECT DISTINCT COALESCE(tag,'manual') FROM paper_orders WHERE status='pending'"
+        f"SELECT DISTINCT {WALLET_SQL} FROM paper_orders WHERE status='pending'"
     ).fetchall()}
     for key in keys:
         _ensure_wallet(conn, key)
@@ -112,6 +113,10 @@ def _mark_price(tag: str | None) -> dict | None:
     if price is not None:
         return price
     runner = AUTOTRADERS.get(tag or "manual")
+    if runner is None and tag == SHARED_WALLET:
+        # the shared wallet has no runner of its own — any running
+        # strategy's price source values its positions the same way
+        runner = next(iter(AUTOTRADERS.running()), None)
     if runner is None:
         return None
     if runner.mode != "biquote":
@@ -129,7 +134,7 @@ def _wallet_stats(conn, key: str, wallet: dict, price: dict | None) -> dict:
     win-rate/profit-factor/drawdown numbers /stats has always reported,
     just filtered to this wallet's own trades."""
     positions = [dict(r) for r in conn.execute(
-        "SELECT * FROM paper_positions WHERE COALESCE(tag, 'manual') = ?", (key,)
+        f"SELECT * FROM paper_positions WHERE {WALLET_SQL} = ?", (key,)
     ).fetchall()]
     floating = 0.0
     margin_used = 0.0
@@ -140,7 +145,7 @@ def _wallet_stats(conn, key: str, wallet: dict, price: dict | None) -> dict:
     equity = wallet["balance"] + floating
 
     trades = [dict(r) for r in conn.execute(
-        "SELECT * FROM paper_trade_history WHERE COALESCE(tag, 'manual') = ? ORDER BY exit_time ASC", (key,)
+        f"SELECT * FROM paper_trade_history WHERE {WALLET_SQL} = ? ORDER BY exit_time ASC", (key,)
     ).fetchall()]
     n = len(trades)
     wins = [t for t in trades if t["net_pnl"] > 0]
@@ -162,7 +167,7 @@ def _wallet_stats(conn, key: str, wallet: dict, price: dict | None) -> dict:
     today = datetime.now(timezone.utc).date().isoformat()
     today_pnl = conn.execute(
         "SELECT COALESCE(SUM(net_pnl),0) s FROM paper_trade_history "
-        "WHERE substr(exit_time,1,10) = ? AND COALESCE(tag,'manual') = ?",
+        f"WHERE substr(exit_time,1,10) = ? AND {WALLET_SQL} = ?",
         (today, key),
     ).fetchone()["s"]
 
@@ -207,13 +212,14 @@ def _fill_order(conn, order_row: dict, price: float, ts, costs_cfg: CostConfig):
     conn.execute(
         """INSERT INTO paper_positions
            (order_id, direction, units, lots, entry_price, entry_time, initial_stop, stop_loss,
-            take_profit, risk_per_oz, risk_amount, entry_cost_per_oz, tag, time_exit, trail_atr_mult)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            take_profit, risk_per_oz, risk_amount, entry_cost_per_oz, tag, time_exit, trail_atr_mult, wallet_key)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             order_row["id"], order_row["direction"], order_row["units"], order_row["lots"],
             price, ts.isoformat(), order_row["stop_loss"], order_row["stop_loss"],
             order_row["take_profit"], risk_per_oz, order_row["risk_amount"] or 0.0, ec,
             order_row.get("tag"), order_row.get("time_exit"), order_row.get("trail_atr_mult"),
+            order_row.get("wallet_key"),
         ),
     )
     if order_row.get("tag"):
@@ -226,16 +232,17 @@ def _close_position(conn, pos_row: dict, exit_info: dict, ts):
     conn.execute(
         """INSERT INTO paper_trade_history
            (direction, units, lots, entry_price, entry_time, exit_price, exit_time,
-            stop_loss, take_profit, gross_pnl, costs, net_pnl, r_multiple, exit_reason, tag)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            stop_loss, take_profit, gross_pnl, costs, net_pnl, r_multiple, exit_reason, tag, wallet_key)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (
             pos_row["direction"], pos_row["units"], pos_row["lots"], pos_row["entry_price"],
             pos_row["entry_time"], exit_info["price"], ts.isoformat(), pos_row["stop_loss"],
             pos_row["take_profit"], exit_info["gross_pnl"], exit_info["costs"],
             exit_info["net_pnl"], exit_info["r_multiple"], exit_info["reason"], pos_row.get("tag"),
+            pos_row.get("wallet_key"),
         ),
     )
-    key = _wallet_key(pos_row.get("tag"))
+    key = pos_row.get("wallet_key") or _wallet_key(pos_row.get("tag"))
     wallet = _get_wallet(conn, key)
     new_balance = wallet["balance"] + exit_info["net_pnl"]
     new_peak = max(wallet["peak_balance"], new_balance)
@@ -608,13 +615,13 @@ def reset_wallet(wallet_key: str, starting_balance: float = 10_000.0):
     conn = db.get_conn()
     try:
         conn.execute(
-            "DELETE FROM paper_orders WHERE COALESCE(tag,'manual') = ?", (wallet_key,)
+            f"DELETE FROM paper_orders WHERE {WALLET_SQL} = ?", (wallet_key,)
         )
         conn.execute(
-            "DELETE FROM paper_positions WHERE COALESCE(tag,'manual') = ?", (wallet_key,)
+            f"DELETE FROM paper_positions WHERE {WALLET_SQL} = ?", (wallet_key,)
         )
         conn.execute(
-            "DELETE FROM paper_trade_history WHERE COALESCE(tag,'manual') = ?", (wallet_key,)
+            f"DELETE FROM paper_trade_history WHERE {WALLET_SQL} = ?", (wallet_key,)
         )
         _ensure_wallet(conn, wallet_key, starting_balance)
         conn.execute(
@@ -708,7 +715,7 @@ def _risk_block_reason(conn, settings: dict, wallet: dict, key: str) -> str | No
     if settings["max_daily_loss_pct"] is not None:
         today_pnl = conn.execute(
             "SELECT COALESCE(SUM(net_pnl),0) s FROM paper_trade_history "
-            "WHERE substr(exit_time,1,10) = ? AND COALESCE(tag,'manual') = ?",
+            f"WHERE substr(exit_time,1,10) = ? AND {WALLET_SQL} = ?",
             (today, key),
         ).fetchone()["s"]
         day_pct = 100 * today_pnl / wallet["balance"] if wallet["balance"] else 0
@@ -760,7 +767,7 @@ def place_order(req: PlaceOrderRequest):
         settings = dict(conn.execute("SELECT * FROM risk_settings WHERE id = 1").fetchone())
 
         open_count = conn.execute(
-            "SELECT COUNT(*) c FROM paper_positions WHERE COALESCE(tag,'manual') = ?", (key,)
+            f"SELECT COUNT(*) c FROM paper_positions WHERE {WALLET_SQL} = ?", (key,)
         ).fetchone()["c"]
         if open_count >= settings["max_open_positions"]:
             raise HTTPException(
