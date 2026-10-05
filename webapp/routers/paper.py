@@ -27,6 +27,7 @@ from gold_bot.indicators import atr
 from gold_bot.risk import position_size
 from gold_bot.sessions import session_of
 from webapp import biquote_client, db
+from webapp import portfolio
 from webapp.portfolio import SHARED_WALLET, WALLET_SQL
 from webapp.autotrade import ACTIVITY, AUTOTRADERS
 from webapp.feed import FEED
@@ -528,6 +529,45 @@ def resume_saved_autotrades() -> None:
                 "error",
                 f"could not auto-resume wallet '{row['wallet_key']}' ({row['strategy_id']}) on startup: {exc!r}",
             )
+
+
+class PortfolioSettingsIn(BaseModel):
+    max_open: int
+    max_trades_per_day: int
+    max_trades_per_session: int
+
+
+@router.get("/portfolio/settings")
+def get_portfolio_settings():
+    """Limits for the wallet every auto-trading strategy shares."""
+    conn = db.get_conn()
+    try:
+        return portfolio.get_settings(conn)
+    finally:
+        conn.close()
+
+
+@router.put("/portfolio/settings")
+def put_portfolio_settings(req: PortfolioSettingsIn):
+    values = req.model_dump()
+    for key, val in values.items():
+        if not 1 <= val <= 1000:
+            raise HTTPException(400, f"{key} must be between 1 and 1000")
+    conn = db.get_conn()
+    try:
+        conn.execute(
+            "UPDATE portfolio_settings SET max_open = ?, max_trades_per_day = ?, max_trades_per_session = ? WHERE id = 1",
+            (values["max_open"], values["max_trades_per_day"], values["max_trades_per_session"]),
+        )
+        conn.commit()
+        ACTIVITY.add(
+            "info",
+            f"Shared wallet limits changed: max {values['max_open']} open, "
+            f"{values['max_trades_per_day']} trades/day, {values['max_trades_per_session']} trades/session",
+        )
+        return portfolio.get_settings(conn)
+    finally:
+        conn.close()
 
 
 @router.get("/autotrade/activity")

@@ -148,6 +148,14 @@ CREATE TABLE IF NOT EXISTS paper_trade_history (
     exit_reason TEXT NOT NULL,
     tag TEXT
 );
+-- user-editable limits for the shared strategy wallet (webapp.portfolio)
+CREATE TABLE IF NOT EXISTS portfolio_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    max_open INTEGER NOT NULL DEFAULT 5,
+    max_trades_per_day INTEGER NOT NULL DEFAULT 20,
+    max_trades_per_session INTEGER NOT NULL DEFAULT 15
+);
+
 CREATE TABLE IF NOT EXISTS optimizer_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     enabled INTEGER NOT NULL DEFAULT 1
@@ -221,6 +229,7 @@ def init_db() -> None:
         conn.execute(
             "INSERT OR IGNORE INTO paper_account (id, created_at) VALUES (1, datetime('now'))"
         )
+        conn.execute("INSERT OR IGNORE INTO portfolio_settings (id) VALUES (1)")
         # NOTE: no migration copies paper_account's old aggregate balance
         # into a wallet here — webapp.routers.paper._ensure_wallet
         # reconstructs each wallet (including 'manual') from that wallet's

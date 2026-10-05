@@ -484,7 +484,9 @@ class AutoTrader:
         open_count = conn.execute(
             f"SELECT COUNT(*) c FROM paper_positions WHERE {portfolio.WALLET_SQL} = ?", (self.fund_key,)
         ).fetchone()["c"]
-        if open_count >= settings["max_open_positions"]:
+        # the shared wallet's own (user-editable) max-open limit replaces the
+        # account-wide one, which stays in force for the manual wallet
+        if self.fund_key != portfolio.SHARED_WALLET and open_count >= settings["max_open_positions"]:
             block_reason = f"already at the max open positions limit ({settings['max_open_positions']})"
         else:
             block_reason = (

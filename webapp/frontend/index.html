@@ -415,6 +415,23 @@
     <div class="bt-panel">
       <div class="bt-panel-title">Running strategies <span class="bt-panel-note" id="autoRunningCount"></span></div>
       <div id="autoFundWallet" class="bt-panel-note"></div>
+      <div class="bt-field-row">
+        <div>
+          <label for="pfMaxOpen">Max open trades</label>
+          <input type="number" id="pfMaxOpen" min="1" max="1000" step="1">
+        </div>
+        <div>
+          <label for="pfMaxDay">Max trades / day</label>
+          <input type="number" id="pfMaxDay" min="1" max="1000" step="1">
+        </div>
+        <div>
+          <label for="pfMaxSession">Max trades / session</label>
+          <input type="number" id="pfMaxSession" min="1" max="1000" step="1">
+        </div>
+      </div>
+      <div class="bt-panel-note">Limits for the shared wallet, across all running strategies. Changes apply from the next bar.</div>
+      <button type="button" class="dash-mini-action" id="pfSaveBtn">Save limits</button>
+      <span class="bt-panel-note" id="pfSaveMsg"></span>
       <div id="autoRunningList" class="bt-panel-note">Nothing running yet.</div>
     </div>
 
@@ -722,7 +739,7 @@
 <script src="/js/backtest.js?v=7"></script>
 <script src="/js/strategies.js?v=4"></script>
 <script src="/js/settings.js?v=3"></script>
-<script src="/js/paper.js?v=21"></script>
+<script src="/js/paper.js?v=22"></script>
 <script src="/js/ai.js?v=1"></script>
 <script src="/js/optimizer.js?v=3"></script>
 <script src="/js/app.js?v=23"></script>

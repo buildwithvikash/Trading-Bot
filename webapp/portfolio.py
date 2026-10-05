@@ -16,9 +16,9 @@ wallet_key and keep the 'manual' wallet.
 
 Limits come from the Oct 2026 review of 194 paper trades (20 Sep - 5 Oct):
 one same-direction entry per 30 minutes (de-duplicating cut drawdown from
-18.8R to 12.3R for 0.9R of profit), never long and short at once, at most
-2 open, 6 trades a day / 3 per session, and stop for the day at -3R or after
-3 straight losses.
+18.8R to 12.3R for 0.9R of profit), never long and short at once, and stop
+for the day at -3R or after 3 straight losses. Max open trades and trades
+per day / per session are user-editable (portfolio_settings).
 """
 
 from __future__ import annotations
@@ -36,9 +36,10 @@ SHARED_WALLET = "portfolio"
 # pre-shared-wallet rule (one wallet per strategy tag, 'manual' if untagged)
 WALLET_SQL = "COALESCE(wallet_key, tag, 'manual')"
 
-MAX_OPEN = 2               # open positions + pending entry orders
-MAX_TRADES_PER_DAY = 6
-MAX_TRADES_PER_SESSION = 3
+# max open (positions + pending entry orders), trades per day and trades
+# per session are user-editable — stored in portfolio_settings, read on
+# every check so a change applies from the next bar without a restart
+SETTING_KEYS = ("max_open", "max_trades_per_day", "max_trades_per_session")
 DAILY_STOP_R = -3.0
 MAX_CONSECUTIVE_LOSSES = 3
 DEDUPE_MINUTES = 30
@@ -47,6 +48,11 @@ DEDUPE_MINUTES = 30
 def _utc(value) -> pd.Timestamp:
     t = pd.Timestamp(value)
     return t.tz_localize("UTC") if t.tzinfo is None else t.tz_convert("UTC")
+
+
+def get_settings(conn) -> dict:
+    row = conn.execute("SELECT * FROM portfolio_settings WHERE id = 1").fetchone()
+    return {k: row[k] for k in SETTING_KEYS}
 
 
 def _entries_on(conn, wallet: str, day: str) -> list[pd.Timestamp]:
@@ -66,14 +72,15 @@ def entry_block_reason(conn, wallet: str, ts) -> str | None:
         return None
     ts = _utc(ts)
     day = ts.date().isoformat()
+    limits = get_settings(conn)
 
     open_now = conn.execute(
         f"SELECT (SELECT COUNT(*) FROM paper_positions WHERE {WALLET_SQL} = ?) + "
         f"(SELECT COUNT(*) FROM paper_orders WHERE status = 'pending' AND {WALLET_SQL} = ?)",
         (wallet, wallet),
     ).fetchone()[0]
-    if open_now >= MAX_OPEN:
-        return f"portfolio already has {open_now} open/pending trades (max {MAX_OPEN})"
+    if open_now >= limits["max_open"]:
+        return f"portfolio already has {open_now} open/pending trades (max {limits['max_open']})"
 
     closed_today = [r[0] for r in conn.execute(
         f"SELECT r_multiple FROM paper_trade_history WHERE {WALLET_SQL} = ? AND substr(exit_time,1,10) = ? "
@@ -88,12 +95,12 @@ def entry_block_reason(conn, wallet: str, ts) -> str | None:
         return f"{MAX_CONSECUTIVE_LOSSES} losses in a row today — done for the day"
 
     entries = _entries_on(conn, wallet, day)
-    if len(entries) >= MAX_TRADES_PER_DAY:
-        return f"{len(entries)} trades already taken today (max {MAX_TRADES_PER_DAY})"
+    if len(entries) >= limits["max_trades_per_day"]:
+        return f"{len(entries)} trades already taken today (max {limits['max_trades_per_day']})"
     session = session_of(ts)
     in_session = sum(1 for e in entries if session_of(e) == session)
-    if in_session >= MAX_TRADES_PER_SESSION:
-        return f"{in_session} trades already taken this {session} session (max {MAX_TRADES_PER_SESSION})"
+    if in_session >= limits["max_trades_per_session"]:
+        return f"{in_session} trades already taken this {session} session (max {limits['max_trades_per_session']})"
     return None
 
 

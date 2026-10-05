@@ -536,9 +536,41 @@ window.PaperView = (function () {
     refreshAll();
   }
 
+  // limits for the shared wallet (webapp.portfolio) — loaded once rather
+  // than on the 2s status poll, so a half-typed value isn't overwritten
+  const PF_FIELDS = { pfMaxOpen: 'max_open', pfMaxDay: 'max_trades_per_day', pfMaxSession: 'max_trades_per_session' };
+
+  async function loadPortfolioLimits() {
+    try {
+      const s = await (await fetch('/api/paper/portfolio/settings')).json();
+      Object.entries(PF_FIELDS).forEach(([id, key]) => { document.getElementById(id).value = s[key]; });
+    } catch (err) {
+      console.error('loadPortfolioLimits: failed', err);
+    }
+  }
+
+  async function savePortfolioLimits() {
+    const msg = document.getElementById('pfSaveMsg');
+    const body = {};
+    Object.entries(PF_FIELDS).forEach(([id, key]) => { body[key] = Number(document.getElementById(id).value); });
+    const res = await fetch('/api/paper/portfolio/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      msg.textContent = 'Saved';
+      refreshActivity();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      msg.textContent = d.detail ? `Not saved: ${typeof d.detail === 'string' ? d.detail : 'enter whole numbers from 1 to 1000'}` : 'Not saved';
+    }
+    setTimeout(() => { msg.textContent = ''; }, 4000);
+  }
+
   async function initAutoTrade() {
     document.getElementById('autoToggle').addEventListener('click', startAutoTrade);
     document.getElementById('autoSelectAllBtn').addEventListener('click', toggleSelectAllAuto);
+    document.getElementById('pfSaveBtn').addEventListener('click', savePortfolioLimits);
+    loadPortfolioLimits();
     await refreshAutoConfigs();
     await refreshAutoStatus().catch(err => console.error('initAutoTrade: failed to load status', err));
   }
