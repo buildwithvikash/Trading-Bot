@@ -262,8 +262,9 @@ window.PaperView = (function () {
     tableEl.querySelectorAll('[data-reset-wallet]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const key = btn.dataset.resetWallet;
-        if (!confirm(`Reset the "${key}" wallet? This clears its balance, pending orders, open positions and trade history back to a starting balance. Other wallets are untouched.`)) return;
-        const input = prompt('Starting balance for this wallet:', '10000');
+        if (!confirm(`Start the "${key}" wallet over? Its past trades are archived and stay in History. Pending orders are cancelled and any open positions are dropped. Other wallets are untouched.`)) return;
+        const current = wallets.find(w => w.wallet_key === key);
+        const input = prompt('Starting balance for this wallet:', String(current ? current.starting_balance : 10000));
         if (input === null) return;
         const startingBalance = Number(input);
         if (!isFinite(startingBalance) || startingBalance <= 0) { alert('Enter a valid positive number.'); return; }

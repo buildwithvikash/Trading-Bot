@@ -91,7 +91,8 @@ def _ensure_all_known_wallets(conn) -> None:
         f"SELECT DISTINCT {WALLET_SQL} FROM paper_orders WHERE status='pending'"
     ).fetchall()}
     for key in keys:
-        _ensure_wallet(conn, key)
+        if not portfolio.is_archive(key):
+            _ensure_wallet(conn, key)
 
 
 def _get_wallet(conn, key: str) -> dict:
@@ -643,35 +644,48 @@ def list_wallets():
         _ensure_all_known_wallets(conn)
         conn.commit()
         rows = conn.execute("SELECT * FROM paper_wallets ORDER BY wallet_key").fetchall()
-        return [_wallet_stats(conn, r["wallet_key"], dict(r), _mark_price(r["wallet_key"])) for r in rows]
+        return [
+            _wallet_stats(conn, r["wallet_key"], dict(r), _mark_price(r["wallet_key"]))
+            for r in rows if not portfolio.is_archive(r["wallet_key"])
+        ]
     finally:
         conn.close()
 
 
 @router.post("/wallets/{wallet_key}/reset")
 def reset_wallet(wallet_key: str, starting_balance: float = 10_000.0):
-    """Resets ONE wallet — its balance and its own orders/positions/trade
-    history — leaving every other strategy's wallet untouched."""
+    """Starts ONE wallet over at `starting_balance`, leaving every other
+    wallet untouched. Its closed trades are archived, not deleted (see
+    webapp.portfolio.ARCHIVE_MARK) so they stay in History; pending orders
+    are cancelled and open positions are dropped."""
+    if portfolio.is_archive(wallet_key):
+        raise HTTPException(400, "archived trade runs can't be reset")
+    now = datetime.now(timezone.utc)
     conn = db.get_conn()
     try:
         conn.execute(
-            f"DELETE FROM paper_orders WHERE {WALLET_SQL} = ?", (wallet_key,)
+            f"UPDATE paper_orders SET status = 'cancelled', cancelled_at = ? WHERE status = 'pending' AND {WALLET_SQL} = ?",
+            (now.isoformat(), wallet_key),
         )
         conn.execute(
             f"DELETE FROM paper_positions WHERE {WALLET_SQL} = ?", (wallet_key,)
         )
-        conn.execute(
-            f"DELETE FROM paper_trade_history WHERE {WALLET_SQL} = ?", (wallet_key,)
-        )
+        archived = conn.execute(
+            f"UPDATE paper_trade_history SET wallet_key = ? WHERE {WALLET_SQL} = ?",
+            (portfolio.archive_key(wallet_key, now), wallet_key),
+        ).rowcount
+        if archived:
+            ACTIVITY.add("info", f"Wallet '{wallet_key}' reset to ${starting_balance:,.2f} — {archived} past trade(s) archived, still in History")
         _ensure_wallet(conn, wallet_key, starting_balance)
         conn.execute(
             "UPDATE paper_wallets SET starting_balance = ?, balance = ?, peak_balance = ? WHERE wallet_key = ?",
             (starting_balance, starting_balance, starting_balance, wallet_key),
         )
         conn.commit()
-        return _wallet_stats(conn, wallet_key, dict(conn.execute(
+        stats = _wallet_stats(conn, wallet_key, dict(conn.execute(
             "SELECT * FROM paper_wallets WHERE wallet_key = ?", (wallet_key,)
         ).fetchone()), FEED.current_price())
+        return {**stats, "archived_trades": archived}
     finally:
         conn.close()
 
@@ -897,6 +911,7 @@ def get_history(limit: int = 200, tag: str | None = None):
         for r in rows:
             d = dict(r)
             d["session"] = session_of(pd.Timestamp(d["entry_time"]))
+            d["archived"] = portfolio.is_archive(d.get("wallet_key"))
             out.append(d)
         return out
     finally:
@@ -920,15 +935,27 @@ def get_stats(wallet: str = "manual"):
 
 @router.post("/reset")
 def reset_account(starting_balance: float = 10_000.0):
-    """Resets EVERY wallet (all strategies plus manual) — the nuclear
-    option. To reset just one strategy's wallet, use
+    """Starts EVERY wallet (shared portfolio, old per-strategy wallets and
+    manual) over at `starting_balance`. Closed trades are archived per
+    wallet, not deleted, so History keeps them; pending orders are cancelled
+    and open positions dropped. To reset just one wallet, use
     POST /wallets/{wallet_key}/reset instead."""
+    now = datetime.now(timezone.utc)
     conn = db.get_conn()
     try:
-        conn.execute("DELETE FROM paper_orders")
+        conn.execute(
+            "UPDATE paper_orders SET status = 'cancelled', cancelled_at = ? WHERE status = 'pending'", (now.isoformat(),)
+        )
         conn.execute("DELETE FROM paper_positions")
-        conn.execute("DELETE FROM paper_trade_history")
-        keys = [r["wallet_key"] for r in conn.execute("SELECT wallet_key FROM paper_wallets").fetchall()] or ["manual"]
+        live = [r[0] for r in conn.execute(f"SELECT DISTINCT {WALLET_SQL} FROM paper_trade_history").fetchall()]
+        for key in live:
+            if not portfolio.is_archive(key):
+                conn.execute(
+                    f"UPDATE paper_trade_history SET wallet_key = ? WHERE {WALLET_SQL} = ?",
+                    (portfolio.archive_key(key, now), key),
+                )
+        keys = [r["wallet_key"] for r in conn.execute("SELECT wallet_key FROM paper_wallets").fetchall()
+                if not portfolio.is_archive(r["wallet_key"])] or ["manual"]
         for key in keys:
             _ensure_wallet(conn, key, starting_balance)
             conn.execute(

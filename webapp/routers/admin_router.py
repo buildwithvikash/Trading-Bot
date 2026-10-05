@@ -14,7 +14,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
-from webapp import db
+from webapp import db, portfolio
 from webapp.routers import paper
 
 router = APIRouter()
@@ -62,13 +62,18 @@ def purge_trades(req: PurgeTradesRequest):
 
         conn.execute(f"DELETE FROM paper_trade_history WHERE id IN ({placeholders})", req.trade_ids)
 
-        affected_keys = sorted({(r.get("tag") or "manual") for r in rows})
+        # whose money each deleted row was (see webapp.portfolio.WALLET_SQL);
+        # an archived run has no live wallet balance to recompute
+        affected_keys = sorted({
+            k for k in ((r.get("wallet_key") or r.get("tag") or "manual") for r in rows)
+            if not portfolio.is_archive(k)
+        })
         wallets = {}
         for key in affected_keys:
             wallet = conn.execute("SELECT * FROM paper_wallets WHERE wallet_key = ?", (key,)).fetchone()
             starting = wallet["starting_balance"] if wallet else 1000.0
             remaining = conn.execute(
-                "SELECT net_pnl FROM paper_trade_history WHERE COALESCE(tag,'manual') = ? ORDER BY exit_time ASC",
+                f"SELECT net_pnl FROM paper_trade_history WHERE {portfolio.WALLET_SQL} = ? ORDER BY exit_time ASC",
                 (key,),
             ).fetchall()
             balance = starting

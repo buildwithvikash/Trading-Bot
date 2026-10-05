@@ -36,6 +36,20 @@ SHARED_WALLET = "portfolio"
 # pre-shared-wallet rule (one wallet per strategy tag, 'manual' if untagged)
 WALLET_SQL = "COALESCE(wallet_key, tag, 'manual')"
 
+# Resetting a wallet re-labels its closed trades to "<wallet>#archived-<UTC
+# time>" instead of deleting them: History still lists them, but every
+# balance/stat/limit query is scoped to the live wallet key, so the fresh
+# run starts clean. Archive keys are hidden from the wallet list.
+ARCHIVE_MARK = "#archived-"
+
+
+def archive_key(wallet: str, when: datetime) -> str:
+    return f"{wallet}{ARCHIVE_MARK}{when.strftime('%Y%m%dT%H%M%S')}"
+
+
+def is_archive(wallet: str | None) -> bool:
+    return bool(wallet) and ARCHIVE_MARK in wallet
+
 # max open (positions + pending entry orders), trades per day and trades
 # per session are user-editable — stored in portfolio_settings, read on
 # every check so a change applies from the next bar without a restart
